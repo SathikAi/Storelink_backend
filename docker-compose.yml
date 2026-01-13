@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: storelink_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: storelink_production
+      MYSQL_USER: storelink_user
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - storelink_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: storelink_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - storelink_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: storelink_backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+pymysql://storelink_user:${MYSQL_PASSWORD}@mysql:3306/storelink_production
+      SECRET_KEY: ${SECRET_KEY}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_ENABLED: "true"
+      RATE_LIMIT_ENABLED: "true"
+      ENVIRONMENT: production
+      DEBUG: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/var/log/storelink
+    ports:
+      - "8000:8000"
+    networks:
+      - storelink_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  nginx:
+    image: nginx:alpine
+    container_name: storelink_nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./backend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./backend/uploads:/var/www/storelink/uploads:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    networks:
+      - storelink_network
+
+  certbot:
+    image: certbot/certbot
+    container_name: storelink_certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  storelink_network:
+    driver: bridge
