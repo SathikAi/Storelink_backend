@@ -18,6 +18,7 @@ class OTPVerification(Base):
     otp_code = Column(String(6), nullable=False)
     purpose = Column(Enum(OTPPurpose), nullable=False)
     is_verified = Column(Boolean, default=False)
+    failed_attempts = Column(BigInteger, default=0)
     expires_at = Column(TIMESTAMP, nullable=False, index=True)
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
 

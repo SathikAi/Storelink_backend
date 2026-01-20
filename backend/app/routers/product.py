@@ -40,12 +40,13 @@ async def get_products(
     category_id: Optional[int] = None,
     is_active: Optional[bool] = None,
     search: Optional[str] = None,
+    low_stock: Optional[bool] = None,
     business_id: int = Depends(get_current_business_id),
     db: Session = Depends(get_db)
 ):
     product_service = ProductService(db)
     products, total = product_service.get_products(
-        business_id, page, page_size, category_id, is_active, search
+        business_id, page, page_size, category_id, is_active, search, low_stock
     )
     
     return ProductListResponse(
@@ -54,6 +55,22 @@ async def get_products(
         total=total,
         page=page,
         page_size=page_size
+    )
+
+
+@router.patch("/{product_uuid}/stock", response_model=ProductSingleResponse)
+async def update_product_stock(
+    product_uuid: str,
+    quantity_change: int = Query(..., description="Positive to increase, negative to decrease"),
+    business_id: int = Depends(get_current_business_id),
+    db: Session = Depends(get_db)
+):
+    product_service = ProductService(db)
+    product = product_service.update_stock(business_id, product_uuid, quantity_change)
+    
+    return ProductSingleResponse(
+        message="Stock updated successfully",
+        data=ProductResponse.model_validate(product)
     )
 
 

@@ -66,8 +66,9 @@ async def get_current_business_id(
     db: Session = Depends(get_db)
 ) -> Optional[int]:
     from app.models.business import Business
+    from app.models.user import UserRole
     
-    if current_user.role == "SUPER_ADMIN":
+    if current_user.role == UserRole.SUPER_ADMIN:
         return None
     
     business = db.query(Business).filter(

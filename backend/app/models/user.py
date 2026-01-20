@@ -22,6 +22,8 @@ class User(Base):
     role = Column(Enum(UserRole), nullable=False, default=UserRole.BUSINESS_OWNER, index=True)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+    failed_login_attempts = Column(BigInteger, default=0)
+    locked_until = Column(TIMESTAMP, nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
     deleted_at = Column(TIMESTAMP, nullable=True)

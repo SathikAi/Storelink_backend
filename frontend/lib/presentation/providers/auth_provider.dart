@@ -16,6 +16,7 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus _status = AuthStatus.initial;
   UserEntity? _user;
   BusinessEntity? _business;
+  String? _accessToken;
   String? _error;
 
   AuthProvider(this._authRepository);
@@ -23,6 +24,7 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus get status => _status;
   UserEntity? get user => _user;
   BusinessEntity? get business => _business;
+  String? get accessToken => _accessToken;
   String? get error => _error;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
 
@@ -36,6 +38,7 @@ class AuthProvider extends ChangeNotifier {
       if (result != null) {
         _user = result.user;
         _business = result.business;
+        _accessToken = await _authRepository.getAccessToken();
         _status = AuthStatus.authenticated;
       } else {
         _status = AuthStatus.unauthenticated;
@@ -72,6 +75,7 @@ class AuthProvider extends ChangeNotifier {
 
       _user = result.user;
       _business = result.business;
+      _accessToken = result.tokens?.accessToken;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -99,6 +103,7 @@ class AuthProvider extends ChangeNotifier {
 
       _user = result.user;
       _business = result.business;
+      _accessToken = result.tokens?.accessToken;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -143,6 +148,7 @@ class AuthProvider extends ChangeNotifier {
 
       _user = result.user;
       _business = result.business;
+      _accessToken = result.tokens?.accessToken;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -158,6 +164,7 @@ class AuthProvider extends ChangeNotifier {
     await _authRepository.logout();
     _user = null;
     _business = null;
+    _accessToken = null;
     _status = AuthStatus.unauthenticated;
     _error = null;
     notifyListeners();

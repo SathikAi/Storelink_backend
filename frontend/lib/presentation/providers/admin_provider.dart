@@ -4,7 +4,6 @@ import '../../data/models/admin_models.dart';
 
 class AdminProvider with ChangeNotifier {
   final AdminApiDataSource _apiDataSource;
-  String? _token;
 
   AdminProvider(this._apiDataSource);
 

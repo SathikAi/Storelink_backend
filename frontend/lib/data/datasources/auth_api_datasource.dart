@@ -1,8 +1,5 @@
 import 'package:dio/dio.dart';
 import '../../core/constants/api_constants.dart';
-import '../models/user_model.dart';
-import '../models/business_model.dart';
-import '../models/auth_tokens_model.dart';
 
 class AuthApiDatasource {
   final Dio _dio;

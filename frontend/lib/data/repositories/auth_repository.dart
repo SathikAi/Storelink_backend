@@ -1,17 +1,14 @@
+import '../../core/services/token_service.dart';
 import '../datasources/auth_api_datasource.dart';
 import '../models/user_model.dart';
 import '../models/business_model.dart';
 import '../models/auth_tokens_model.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthRepository {
   final AuthApiDatasource _apiDatasource;
-  final SharedPreferences _prefs;
+  final TokenService _tokenService;
 
-  static const String _accessTokenKey = 'access_token';
-  static const String _refreshTokenKey = 'refresh_token';
-
-  AuthRepository(this._apiDatasource, this._prefs);
+  AuthRepository(this._apiDatasource, this._tokenService);
 
   Future<AuthResult> register({
     required String phone,
@@ -125,21 +122,20 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
-    await _prefs.remove(_accessTokenKey);
-    await _prefs.remove(_refreshTokenKey);
+    await _tokenService.clearTokens();
   }
 
   Future<String?> getAccessToken() async {
-    return _prefs.getString(_accessTokenKey);
+    return await _tokenService.getAccessToken();
   }
 
   Future<String?> getRefreshToken() async {
-    return _prefs.getString(_refreshTokenKey);
+    return await _tokenService.getRefreshToken();
   }
 
   Future<void> _saveTokens(AuthTokensModel tokens) async {
-    await _prefs.setString(_accessTokenKey, tokens.accessToken);
-    await _prefs.setString(_refreshTokenKey, tokens.refreshToken);
+    await _tokenService.saveAccessToken(tokens.accessToken);
+    await _tokenService.saveRefreshToken(tokens.refreshToken);
   }
 
   Future<bool> isAuthenticated() async {

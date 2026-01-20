@@ -54,7 +54,7 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
 
 
 def generate_otp() -> str:
-    import random
+    import secrets
     if settings.OTP_MOCK:
         return "123456"
-    return str(random.randint(100000, 999999))
+    return "".join([str(secrets.randbelow(10)) for _ in range(6)])

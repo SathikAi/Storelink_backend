@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.routers import auth, business, category, product, customer, order, reports, admin, dashboard
-from app.core.middleware import MultiTenantMiddleware
+from app.core.middleware import MultiTenantMiddleware, SecurityHeadersMiddleware
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.monitoring import RequestLoggingMiddleware, ErrorLoggingMiddleware, setup_sentry
 from app.utils.logger import logger
@@ -19,6 +19,7 @@ app = FastAPI(
     redoc_url="/redoc" if settings.DEBUG else None,
 )
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(ErrorLoggingMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)

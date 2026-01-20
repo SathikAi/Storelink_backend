@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/screens/dashboard/dashboard_screen.dart';
+import 'presentation/screens/business/business_profile_screen.dart';
+import 'presentation/screens/reports/reports_screen.dart';
+import 'presentation/screens/products/products_list_screen.dart';
+import 'presentation/screens/customers/customers_list_screen.dart';
+import 'presentation/screens/orders/orders_list_screen.dart';
+import 'presentation/screens/categories/categories_list_screen.dart';
+import 'presentation/screens/inventory/inventory_list_screen.dart';
 import 'presentation/providers/auth_provider.dart';
 
 class StoreLinkApp extends StatelessWidget {
@@ -20,6 +27,13 @@ class StoreLinkApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/dashboard': (context) => const DashboardScreen(),
+        '/business-profile': (context) => const BusinessProfileScreen(),
+        '/reports': (context) => const ReportsScreen(),
+        '/products': (context) => const ProductsListScreen(),
+        '/customers': (context) => const CustomersListScreen(),
+        '/orders': (context) => const OrdersListScreen(),
+        '/categories': (context) => const CategoriesListScreen(),
+        '/inventory': (context) => const InventoryListScreen(),
       },
     );
   }

@@ -12,8 +12,6 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
     networks:
       - storelink_network
     healthcheck:
@@ -29,8 +27,6 @@ services:
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
     networks:
       - storelink_network
     healthcheck:
@@ -62,8 +58,6 @@ services:
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/var/log/storelink
-    ports:
-      - "8000:8000"
     networks:
       - storelink_network
     healthcheck:
@@ -73,12 +67,31 @@ services:
       retries: 3
       start_period: 40s
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - API_BASE_URL=${API_BASE_URL:-http://localhost/v1}
+    container_name: storelink_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - storelink_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   nginx:
     image: nginx:alpine
     container_name: storelink_nginx
     restart: unless-stopped
     depends_on:
       - backend
+      - frontend
     ports:
       - "80:80"
       - "443:443"

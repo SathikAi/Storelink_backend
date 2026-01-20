@@ -78,8 +78,14 @@ class FileUploadService:
     @staticmethod
     def delete_file(file_path: str) -> bool:
         try:
-            full_path = os.path.join(settings.UPLOAD_DIR, file_path) if not file_path.startswith(settings.UPLOAD_DIR) else file_path
-            if os.path.exists(full_path):
+            upload_dir_abs = os.path.abspath(settings.UPLOAD_DIR)
+            full_path = os.path.abspath(os.path.join(settings.UPLOAD_DIR, file_path))
+            
+            # Path traversal protection: ensure full_path is inside upload_dir_abs
+            if not full_path.startswith(upload_dir_abs):
+                return False
+                
+            if os.path.exists(full_path) and os.path.isfile(full_path):
                 os.remove(full_path)
                 return True
             return False

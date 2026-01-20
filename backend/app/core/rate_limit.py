@@ -89,7 +89,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.url.path in ["/health", "/", "/docs", "/redoc", "/openapi.json"]:
             return await call_next(request)
         
-        client_ip = request.client.host
+        client_ip = request.headers.get("x-forwarded-for")
+        if client_ip:
+            client_ip = client_ip.split(",")[0].strip()
+        else:
+            client_ip = request.client.host
+        
         user_agent = request.headers.get("user-agent", "unknown")
         identifier = f"{client_ip}:{user_agent}"
         

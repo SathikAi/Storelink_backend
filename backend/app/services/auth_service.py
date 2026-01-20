@@ -98,10 +98,34 @@ class AuthService:
             User.deleted_at.is_(None)
         ).first()
         
-        if not user or not verify_password(data.password, user.password_hash):
+        if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid phone number or password"
+            )
+        
+        # Check if account is locked
+        if user.locked_until and user.locked_until > datetime.utcnow():
+            remaining_minutes = int((user.locked_until - datetime.utcnow()).total_seconds() / 60)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Account is temporarily locked due to too many failed attempts. Try again in {remaining_minutes} minutes."
+            )
+        
+        if not verify_password(data.password, user.password_hash):
+            user.failed_login_attempts += 1
+            if user.failed_login_attempts >= 5:
+                user.locked_until = datetime.utcnow() + timedelta(minutes=15)
+                user.failed_login_attempts = 0 # Reset count after locking
+                self.db.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Too many failed attempts. Account locked for 15 minutes."
+                )
+            self.db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Invalid phone number or password. {5 - user.failed_login_attempts} attempts remaining."
             )
         
         if not user.is_active:
@@ -109,6 +133,11 @@ class AuthService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account is deactivated"
             )
+        
+        # Reset failed attempts on successful login
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        self.db.commit()
         
         business = None
         if user.role == UserRole.BUSINESS_OWNER:
@@ -159,7 +188,6 @@ class AuthService:
     def verify_otp(self, data: OTPVerifyRequest) -> bool:
         otp_record = self.db.query(OTPVerification).filter(
             OTPVerification.phone == data.phone,
-            OTPVerification.otp_code == data.otp_code,
             OTPVerification.purpose == data.purpose,
             OTPVerification.is_verified == False
         ).order_by(OTPVerification.created_at.desc()).first()
@@ -167,13 +195,29 @@ class AuthService:
         if not otp_record:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid OTP code"
+                detail="No active OTP found for this phone number"
             )
         
         if datetime.utcnow() > otp_record.expires_at:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="OTP has expired"
+            )
+        
+        if otp_record.failed_attempts >= 5:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Too many failed attempts. Please request a new OTP."
+            )
+        
+        if otp_record.otp_code != data.otp_code:
+            otp_record.failed_attempts += 1
+            self.db.commit()
+            
+            remaining = 5 - otp_record.failed_attempts
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid OTP code. {remaining} attempts remaining."
             )
         
         otp_record.is_verified = True

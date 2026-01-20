@@ -1,5 +1,10 @@
 class ApiConstants {
-  static const String baseUrl = 'http://localhost:8000/v1';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:8000/v1',
+  );
+  
+  static String get uploadUrl => baseUrl.replaceAll('/v1', '/uploads');
   
   static const String authRegister = '/auth/register';
   static const String authLogin = '/auth/login';

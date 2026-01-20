@@ -85,7 +85,8 @@ class ProductService:
         page_size: int = 50,
         category_id: Optional[int] = None,
         is_active: Optional[bool] = None,
-        search: Optional[str] = None
+        search: Optional[str] = None,
+        low_stock: Optional[bool] = None
     ) -> Tuple[List[Product], int]:
         query = self.db.query(Product).filter(
             Product.business_id == business_id,
@@ -97,6 +98,9 @@ class ProductService:
         
         if is_active is not None:
             query = query.filter(Product.is_active == is_active)
+        
+        if low_stock:
+            query = query.filter(Product.stock_quantity < 10)
         
         if search:
             search_pattern = f"%{search}%"
