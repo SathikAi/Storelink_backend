@@ -2,7 +2,7 @@ from typing import List, Dict, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, extract
 from fastapi import HTTPException, status
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from dateutil.relativedelta import relativedelta
 
 from app.models.user import User, UserRole
@@ -369,7 +369,7 @@ class AdminService:
             Order.deleted_at.is_(None)
         ).scalar() or 0.0
         
-        current_month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        current_month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         revenue_this_month = self.db.query(func.sum(Order.total_amount)).filter(
             Order.payment_status == "PAID",

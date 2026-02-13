@@ -50,7 +50,8 @@ class OrderApiDatasource {
       ),
     );
 
-    final data = response.data['orders'] as List;
+    final responseData = response.data;
+    final List data = responseData['orders'] ?? responseData['data']?['orders'] ?? [];
     return data.map((json) => OrderModel.fromJson(json)).toList();
   }
 

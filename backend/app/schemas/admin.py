@@ -1,7 +1,11 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from enum import Enum
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class PlanType(str, Enum):
@@ -120,31 +124,31 @@ class AdminBusinessListResponse(BaseModel):
     success: bool = True
     message: str
     data: dict
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class AdminBusinessDetailResponse(BaseModel):
     success: bool = True
     message: str
     data: AdminBusinessDetail
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class AdminUserListResponse(BaseModel):
     success: bool = True
     message: str
     data: dict
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class AdminStatsResponse(BaseModel):
     success: bool = True
     message: str
     data: PlatformStats
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class AdminStatusUpdateResponse(BaseModel):
     success: bool = True
     message: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)

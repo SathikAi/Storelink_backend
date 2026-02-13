@@ -1,6 +1,6 @@
 import csv
 from io import StringIO
-from datetime import datetime
+from datetime import datetime, timezone
 from app.schemas.report import (
     SalesReportResponse,
     ProductReportResponse,
@@ -17,7 +17,7 @@ class CSVGenerator:
         
         writer.writerow([f"Sales Report - {report_data.business_name}"])
         writer.writerow([f"Period: {report_data.from_date or 'Start'} to {report_data.to_date or 'End'}"])
-        writer.writerow([f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+        writer.writerow([f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"])
         writer.writerow([])
         
         writer.writerow(['Summary'])
@@ -53,7 +53,7 @@ class CSVGenerator:
         
         writer.writerow([f"Product Sales Report - {report_data.business_name}"])
         writer.writerow([f"Period: {report_data.from_date or 'Start'} to {report_data.to_date or 'End'}"])
-        writer.writerow([f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+        writer.writerow([f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"])
         writer.writerow([])
         
         writer.writerow(['Summary'])
@@ -83,7 +83,7 @@ class CSVGenerator:
         
         writer.writerow([f"Customer Report - {report_data.business_name}"])
         writer.writerow([f"Period: {report_data.from_date or 'Start'} to {report_data.to_date or 'End'}"])
-        writer.writerow([f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+        writer.writerow([f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"])
         writer.writerow([])
         
         writer.writerow(['Summary'])

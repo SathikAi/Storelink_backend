@@ -11,7 +11,26 @@ import os
 
 setup_sentry()
 
+from contextlib import asynccontextmanager
+from sqlalchemy import text
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: verify DB connectivity
+    from app.database import engine
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("Database connection verified")
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+    yield
+    # Shutdown
+    engine.dispose()
+    logger.info("Database connections closed")
+
 app = FastAPI(
+    lifespan=lifespan,
     title="StoreLink API",
     description="Indian MSME Business Management SaaS Platform",
     version="1.0.0",
@@ -29,8 +48,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
 )
 
 logger.info(f"Starting StoreLink API - Environment: {settings.ENVIRONMENT}")

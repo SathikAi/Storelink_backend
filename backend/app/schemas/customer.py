@@ -1,7 +1,11 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 import re
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class CustomerCreateRequest(BaseModel):
@@ -137,17 +141,17 @@ class CustomerListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class CustomerSingleResponse(BaseModel):
     success: bool = True
     message: str
     data: CustomerResponse
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class CustomerDeleteResponse(BaseModel):
     success: bool = True
     message: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)

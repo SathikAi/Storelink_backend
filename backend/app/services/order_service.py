@@ -2,7 +2,7 @@ from typing import List, Tuple, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, and_
 from fastapi import HTTPException, status
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from app.models.order import Order, OrderItem, OrderStatus, PaymentStatus
 from app.models.product import Product
@@ -16,7 +16,7 @@ class OrderService:
         self.db = db
     
     def _generate_order_number(self, business_id: int) -> str:
-        today = datetime.now().strftime("%Y%m%d")
+        today = datetime.now(timezone.utc).strftime("%Y%m%d")
         
         count = self.db.query(func.count(Order.id)).filter(
             Order.business_id == business_id,
@@ -301,7 +301,7 @@ class OrderService:
     def delete_order(self, business_id: int, order_uuid: str) -> None:
         order = self.get_order_by_uuid(business_id, order_uuid)
         
-        order.deleted_at = func.now()
+        order.deleted_at = datetime.now(timezone.utc)
         self.db.commit()
     
     def get_order_stats(

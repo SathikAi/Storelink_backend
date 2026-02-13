@@ -14,7 +14,7 @@ from app.services.customer_service import CustomerService
 from app.core.dependencies import get_current_business_id
 from app.models.order import Order
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 from decimal import Decimal
 
@@ -38,7 +38,7 @@ class CustomerOrderHistoryResponse(BaseModel):
     customer_name: str
     data: List[OrderHistoryItem]
     total_orders: int
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 router = APIRouter(prefix="/customers", tags=["Customers"])

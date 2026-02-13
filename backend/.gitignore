@@ -38,6 +38,12 @@ uploads/product_images/*
 !uploads/business_logos/.gitkeep
 !uploads/product_images/.gitkeep
 
+# Test databases
+*.db
+
+# Environment
+.env.production
+
 .DS_Store
 .vscode/
 .idea/

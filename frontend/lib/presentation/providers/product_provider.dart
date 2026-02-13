@@ -189,6 +189,9 @@ class ProductProvider with ChangeNotifier {
   }
 
   Future<bool> toggleProductStatus(String uuid) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
     try {
       final product = await _repository.toggleProductStatus(uuid);
       final index = _products.indexWhere((p) => p.uuid == uuid);
@@ -196,10 +199,12 @@ class ProductProvider with ChangeNotifier {
         _products[index] = product;
       }
       _currentProduct = product;
+      _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
+      _isLoading = false;
       notifyListeners();
       return false;
     }

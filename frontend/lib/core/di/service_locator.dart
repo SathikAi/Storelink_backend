@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../services/token_service.dart';
+import '../constants/api_constants.dart';
 import '../../data/datasources/auth_api_datasource.dart';
 import '../../data/datasources/dashboard_api_datasource.dart';
 import '../../data/datasources/business_api_datasource.dart';
@@ -74,48 +76,89 @@ class ServiceLocator {
       ),
     );
 
-    _dio.interceptors.add(LogInterceptor(
-      requestBody: true,
-      responseBody: true,
-    ));
+    if (kDebugMode) {
+      _dio.interceptors.add(LogInterceptor(
+        requestBody: true,
+        responseBody: true,
+      ));
+    }
 
     _tokenService = TokenService();
+
+    // Token refresh interceptor: automatically refreshes on 401
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onError: (error, handler) async {
+          if (error.response?.statusCode == 401) {
+            try {
+              final refreshToken = await _tokenService.getRefreshToken();
+              if (refreshToken == null) {
+                return handler.next(error);
+              }
+
+              final refreshDio = Dio();
+              final response = await refreshDio.post(
+                '${ApiConstants.baseUrl}${ApiConstants.authRefresh}',
+                data: {'refresh_token': refreshToken},
+              );
+
+              if (response.statusCode == 200 && response.data['success']) {
+                final newAccessToken = response.data['data']['access_token'] as String;
+                final newRefreshToken = response.data['data']['refresh_token'] as String;
+                await _tokenService.saveAccessToken(newAccessToken);
+                await _tokenService.saveRefreshToken(newRefreshToken);
+
+                // Retry the original request with new token
+                final opts = error.requestOptions;
+                opts.headers['Authorization'] = 'Bearer $newAccessToken';
+                final retryResponse = await _dio.fetch(opts);
+                return handler.resolve(retryResponse);
+              }
+            } catch (_) {
+              // Refresh failed — clear tokens so the app navigates to login
+              await _tokenService.clearTokens();
+            }
+          }
+          return handler.next(error);
+        },
+      ),
+    );
 
     _authApiDatasource = AuthApiDatasource(_dio);
     _authRepository = AuthRepository(_authApiDatasource, _tokenService);
     _authProvider = AuthProvider(_authRepository);
 
-    _dashboardApiDatasource = DashboardApiDatasource(_dio);
+    _dashboardApiDatasource = DashboardApiDatasource(_dio, _tokenService);
     _dashboardRepository = DashboardRepository(_dashboardApiDatasource);
     _dashboardProvider = DashboardProvider(_dashboardRepository);
 
-    _businessApiDatasource = BusinessApiDatasource(_dio);
+    _businessApiDatasource = BusinessApiDatasource(_dio, _tokenService);
     _businessRepository = BusinessRepository(_businessApiDatasource);
     _businessProvider = BusinessProvider(_businessRepository);
 
-    _reportApiDatasource = ReportApiDatasource(_dio);
+    _reportApiDatasource = ReportApiDatasource(_dio, _tokenService);
     _reportRepository = ReportRepository(_reportApiDatasource);
     _reportProvider = ReportProvider(_reportRepository);
 
-    _productApiDatasource = ProductApiDatasource(_dio);
+    _productApiDatasource = ProductApiDatasource(_dio, _tokenService);
     _productRepository = ProductRepository(_productApiDatasource);
     _productProvider = ProductProvider(_productRepository);
 
-    _customerApiDatasource = CustomerApiDatasource(_dio);
+    _customerApiDatasource = CustomerApiDatasource(_dio, _tokenService);
     _customerRepository = CustomerRepository(_customerApiDatasource);
     _customerProvider = CustomerProvider(_customerRepository);
 
-    _orderApiDatasource = OrderApiDatasource(_dio);
+    _orderApiDatasource = OrderApiDatasource(_dio, _tokenService);
     _orderRepository = OrderRepository(_orderApiDatasource);
     _orderProvider = OrderProvider(_orderRepository);
 
-    _categoryApiDatasource = CategoryApiDatasource(_dio);
+    _categoryApiDatasource = CategoryApiDatasource(_dio, _tokenService);
     _categoryRepository = CategoryRepository(_categoryApiDatasource);
     _categoryProvider = CategoryProvider(_categoryRepository);
 
     _inventoryProvider = InventoryProvider(_productRepository);
 
-    _adminApiDataSource = AdminApiDataSource(client: _dio);
+    _adminApiDataSource = AdminApiDataSource(client: _dio, tokenService: _tokenService);
     _adminProvider = AdminProvider(_adminApiDataSource);
   }
 

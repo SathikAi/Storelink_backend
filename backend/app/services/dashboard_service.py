@@ -7,6 +7,7 @@ from app.models.product import Product
 from app.models.order import Order, OrderStatus, PaymentStatus
 from app.models.customer import Customer
 from app.models.business import Business, BusinessPlan
+from app.config import settings
 
 
 class DashboardService:
@@ -45,7 +46,7 @@ class DashboardService:
             Product.business_id == business_id,
             Product.deleted_at.is_(None),
             Product.is_active == True,
-            Product.stock_quantity < 10
+            Product.stock_quantity < settings.LOW_STOCK_THRESHOLD
         ).scalar() or 0
         
         total_customers = self.db.query(func.count(Customer.id)).filter(

@@ -1,7 +1,11 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class ProductCreateRequest(BaseModel):
@@ -55,31 +59,31 @@ class ProductListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class ProductSingleResponse(BaseModel):
     success: bool = True
     message: str
     data: ProductResponse
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class ProductDeleteResponse(BaseModel):
     success: bool = True
     message: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class ProductImageUploadResponse(BaseModel):
     success: bool = True
     message: str
     image_url: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class ProductToggleResponse(BaseModel):
     success: bool = True
     message: str
     is_active: bool
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)

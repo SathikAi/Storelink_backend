@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.database import get_db
-from app.core.dependencies import get_current_user
-from app.models.user import User, UserRole
+from app.models.user import User
+from app.core.rbac import require_super_admin
 from app.schemas.admin import (
     AdminBusinessListResponse,
     AdminBusinessDetailResponse,
@@ -18,15 +18,6 @@ from app.schemas.admin import (
 from app.services.admin_service import AdminService
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
-
-
-def require_super_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != UserRole.SUPER_ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied. SUPER_ADMIN role required."
-        )
-    return current_user
 
 
 @router.get("/businesses", response_model=AdminBusinessListResponse)

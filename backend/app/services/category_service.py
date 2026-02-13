@@ -1,4 +1,5 @@
 from typing import List, Tuple, Optional
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from fastapi import HTTPException, status
@@ -107,5 +108,5 @@ class CategoryService:
     def delete_category(self, business_id: int, category_uuid: str) -> None:
         category = self.get_category_by_uuid(business_id, category_uuid)
         
-        category.deleted_at = func.now()
+        category.deleted_at = datetime.now(timezone.utc)
         self.db.commit()

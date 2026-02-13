@@ -15,7 +15,7 @@ class FileUploadService:
     
     @staticmethod
     def validate_image(file: UploadFile) -> None:
-        if not file.content_type in FileUploadService.ALLOWED_MIME_TYPES:
+        if file.content_type not in FileUploadService.ALLOWED_MIME_TYPES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid file type. Allowed types: {', '.join(FileUploadService.ALLOWED_MIME_TYPES)}"
@@ -46,7 +46,8 @@ class FileUploadService:
             if image.width > max_width:
                 ratio = max_width / image.width
                 new_height = int(image.height * ratio)
-                image = image.resize((max_width, new_height), Image.LANCZOS)
+                resample = getattr(Image, "Resampling", Image).LANCZOS
+                image = image.resize((max_width, new_height), resample)
             
             file_extension = os.path.splitext(file.filename)[1].lower()
             unique_filename = f"{uuid.uuid4()}{file_extension}"

@@ -4,7 +4,7 @@ from sqlalchemy import func
 from fastapi import HTTPException, status, UploadFile
 from app.models.business import Business
 from app.models.product import Product
-from app.models.order import Order
+from app.models.order import Order, PaymentStatus
 from app.models.customer import Customer
 from app.schemas.business import BusinessUpdateRequest
 from app.services.plan_limit_service import PlanLimitService
@@ -122,7 +122,7 @@ class BusinessService:
         
         total_revenue = self.db.query(func.sum(Order.total_amount)).filter(
             Order.business_id == business_id,
-            Order.payment_status == "PAID",
+            Order.payment_status == PaymentStatus.PAID,
             Order.deleted_at.is_(None)
         ).scalar() or 0.0
         

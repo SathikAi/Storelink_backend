@@ -1,4 +1,5 @@
 from typing import List, Tuple, Optional
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from fastapi import HTTPException, status, UploadFile
@@ -182,7 +183,7 @@ class ProductService:
     def delete_product(self, business_id: int, product_uuid: str) -> None:
         product = self.get_product_by_uuid(business_id, product_uuid)
         
-        product.deleted_at = func.now()
+        product.deleted_at = datetime.now(timezone.utc)
         self.db.commit()
     
     async def upload_product_image(

@@ -1,7 +1,11 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import re
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class BusinessProfileResponse(BaseModel):
@@ -95,11 +99,11 @@ class LogoUploadResponse(BaseModel):
     success: bool = True
     message: str
     logo_url: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class BusinessResponse(BaseModel):
     success: bool = True
     message: str
     data: BusinessProfileResponse
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)

@@ -1,7 +1,11 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import re
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class RegisterRequest(BaseModel):
@@ -13,6 +17,19 @@ class RegisterRequest(BaseModel):
     business_phone: str = Field(..., min_length=10, max_length=15)
     business_email: Optional[str] = Field(None, max_length=255)
     
+    @field_validator('password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r'\d', v):
+            raise ValueError('Password must contain at least one digit')
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
+            raise ValueError('Password must contain at least one special character')
+        return v
+
     @field_validator('phone', 'business_phone')
     @classmethod
     def validate_phone(cls, v: str) -> str:
@@ -37,13 +54,15 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     phone: str = Field(..., min_length=10, max_length=15)
     password: str = Field(..., min_length=8, max_length=100)
-    
+
     @field_validator('phone')
     @classmethod
     def validate_phone(cls, v: str) -> str:
         phone = re.sub(r'\D', '', v)
         if len(phone) < 10:
             raise ValueError('Phone number must be at least 10 digits')
+        if not phone.startswith(('6', '7', '8', '9')):
+            raise ValueError('Invalid Indian phone number')
         return phone
 
 
@@ -112,11 +131,11 @@ class AuthResponse(BaseModel):
     success: bool = True
     message: str
     data: dict
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class OTPResponse(BaseModel):
     success: bool = True
     message: str
     expires_in_minutes: int
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)

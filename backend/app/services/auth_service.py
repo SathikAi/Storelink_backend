@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Tuple
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
@@ -12,7 +12,8 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
-    generate_otp
+    generate_otp,
+    verify_otp,
 )
 from app.schemas.auth import RegisterRequest, LoginRequest, OTPSendRequest, OTPVerifyRequest
 from app.config import settings
@@ -105,8 +106,8 @@ class AuthService:
             )
         
         # Check if account is locked
-        if user.locked_until and user.locked_until > datetime.utcnow():
-            remaining_minutes = int((user.locked_until - datetime.utcnow()).total_seconds() / 60)
+        if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+            remaining_minutes = int((user.locked_until - datetime.now(timezone.utc)).total_seconds() / 60)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Account is temporarily locked due to too many failed attempts. Try again in {remaining_minutes} minutes."
@@ -115,7 +116,7 @@ class AuthService:
         if not verify_password(data.password, user.password_hash):
             user.failed_login_attempts += 1
             if user.failed_login_attempts >= 5:
-                user.locked_until = datetime.utcnow() + timedelta(minutes=15)
+                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
                 user.failed_login_attempts = 0 # Reset count after locking
                 self.db.commit()
                 raise HTTPException(
@@ -169,7 +170,7 @@ class AuthService:
                 )
         
         otp_code = generate_otp()
-        expires_at = datetime.utcnow() + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
         
         otp_record = OTPVerification(
             phone=data.phone,
@@ -198,7 +199,7 @@ class AuthService:
                 detail="No active OTP found for this phone number"
             )
         
-        if datetime.utcnow() > otp_record.expires_at:
+        if datetime.now(timezone.utc) > otp_record.expires_at:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="OTP has expired"
@@ -210,7 +211,7 @@ class AuthService:
                 detail="Too many failed attempts. Please request a new OTP."
             )
         
-        if otp_record.otp_code != data.otp_code:
+        if not verify_otp(data.otp_code, otp_record.otp_code):
             otp_record.failed_attempts += 1
             self.db.commit()
             

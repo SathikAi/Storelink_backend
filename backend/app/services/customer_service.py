@@ -1,4 +1,5 @@
 from typing import List, Tuple, Optional
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from fastapi import HTTPException, status
@@ -125,5 +126,5 @@ class CustomerService:
     def delete_customer(self, business_id: int, customer_uuid: str) -> None:
         customer = self.get_customer_by_uuid(business_id, customer_uuid)
         
-        customer.deleted_at = func.now()
+        customer.deleted_at = datetime.now(timezone.utc)
         self.db.commit()

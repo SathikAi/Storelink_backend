@@ -13,7 +13,7 @@ from app.services.report_service import ReportService
 from app.services.plan_limit_service import PlanLimitService
 from app.utils.pdf_generator import PDFGenerator
 from app.utils.csv_generator import CSVGenerator
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -92,15 +92,15 @@ def export_report_pdf(
     if report_type == "sales":
         report_data = service.get_sales_report(business_id, from_date, to_date)
         pdf_buffer = PDFGenerator.generate_sales_report(report_data)
-        filename = f"sales_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        filename = f"sales_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pdf"
     elif report_type == "products":
         report_data = service.get_product_report(business_id, from_date, to_date)
         pdf_buffer = PDFGenerator.generate_product_report(report_data)
-        filename = f"product_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        filename = f"product_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pdf"
     elif report_type == "customers":
         report_data = service.get_customer_report(business_id, from_date, to_date)
         pdf_buffer = PDFGenerator.generate_customer_report(report_data)
-        filename = f"customer_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        filename = f"customer_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pdf"
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -138,15 +138,15 @@ def export_report_csv(
     if report_type == "sales":
         report_data = service.get_sales_report(business_id, from_date, to_date)
         csv_buffer = CSVGenerator.generate_sales_report(report_data)
-        filename = f"sales_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        filename = f"sales_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
     elif report_type == "products":
         report_data = service.get_product_report(business_id, from_date, to_date)
         csv_buffer = CSVGenerator.generate_product_report(report_data)
-        filename = f"product_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        filename = f"product_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
     elif report_type == "customers":
         report_data = service.get_customer_report(business_id, from_date, to_date)
         csv_buffer = CSVGenerator.generate_customer_report(report_data)
-        filename = f"customer_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        filename = f"customer_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

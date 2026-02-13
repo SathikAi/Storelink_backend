@@ -19,6 +19,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Remove any .env files that may have slipped through .dockerignore
+RUN rm -f .env .env.* 2>/dev/null || true
+
 RUN mkdir -p uploads logs && chmod 755 uploads logs
 
 RUN adduser --disabled-password --gecos "" appuser

@@ -32,7 +32,7 @@ class MultiTenantMiddleware(BaseHTTPMiddleware):
             "/v1/auth/refresh"
         ]
         
-        if request.url.path in public_paths or request.url.path.startswith("/docs") or request.url.path.startswith("/openapi"):
+        if request.url.path in public_paths or request.url.path.startswith("/docs") or request.url.path.startswith("/openapi") or request.url.path.startswith("/uploads"):
             return await call_next(request)
         
         auth_header = request.headers.get("Authorization")

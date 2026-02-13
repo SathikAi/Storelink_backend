@@ -93,13 +93,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if client_ip:
             client_ip = client_ip.split(",")[0].strip()
         else:
-            client_ip = request.client.host
-        
-        user_agent = request.headers.get("user-agent", "unknown")
-        identifier = f"{client_ip}:{user_agent}"
-        
-        if hasattr(request.state, "user") and request.state.user:
-            identifier = f"user:{request.state.user.id}"
+            client_ip = request.client.host if request.client else "unknown"
+
+        identifier = f"ip:{client_ip}"
+
+        if hasattr(request.state, "user_id") and request.state.user_id:
+            identifier = f"user:{request.state.user_id}"
         
         is_allowed = await self.limiter.is_allowed(
             identifier,

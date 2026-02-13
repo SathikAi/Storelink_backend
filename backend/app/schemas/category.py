@@ -1,6 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class CategoryCreateRequest(BaseModel):
@@ -35,17 +39,17 @@ class CategoryListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class CategorySingleResponse(BaseModel):
     success: bool = True
     message: str
     data: CategoryResponse
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class CategoryDeleteResponse(BaseModel):
     success: bool = True
     message: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)

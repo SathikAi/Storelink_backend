@@ -12,9 +12,7 @@ build/
 *.iws
 .DS_Store
 
-*.lock
-
 .metadata
-.flutter-plugins
-.flutter-plugins-dependencies
-pubspec.lock
+
+# Android
+android/local.properties

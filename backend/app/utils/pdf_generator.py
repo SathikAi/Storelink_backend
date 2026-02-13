@@ -5,7 +5,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, timezone
 from app.schemas.report import (
     SalesReportResponse,
     ProductReportResponse,
@@ -46,7 +46,7 @@ class PDFGenerator:
             date_range = f"Period: {from_date or 'Start'} to {to_date or 'End'}"
             elements.append(Paragraph(date_range, subtitle_style))
         
-        generated_text = f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        generated_text = f"Generated on: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC"
         elements.append(Paragraph(generated_text, subtitle_style))
         elements.append(Spacer(1, 0.3 * inch))
         

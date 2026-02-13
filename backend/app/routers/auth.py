@@ -1,4 +1,3 @@
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -68,15 +67,17 @@ async def send_otp(data: OTPSendRequest, db: Session = Depends(get_db)):
     auth_service = AuthService(db)
     otp_record = auth_service.send_otp(data)
     
-    message = f"OTP sent to {data.phone}"
-    if settings.OTP_MOCK:
-        message = f"OTP: {otp_record.otp_code} (Mock mode)"
-    
-    return OTPResponse(
+    response_data = OTPResponse(
         success=True,
-        message=message,
+        message=f"OTP sent to {data.phone}",
         expires_in_minutes=settings.OTP_EXPIRY_MINUTES
     )
+
+    # Only include OTP in response during development with mock mode
+    if settings.OTP_MOCK and settings.is_development:
+        response_data.message = f"OTP: {otp_record.otp_code} (Mock mode)"
+
+    return response_data
 
 
 @router.post("/otp/verify", response_model=AuthResponse)
