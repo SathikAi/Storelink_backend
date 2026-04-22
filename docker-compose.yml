@@ -31,16 +31,31 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       REDIS_ENABLED: "true"
+      REDIS_TTL: "300"
       RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_REQUESTS: "100"
+      RATE_LIMIT_WINDOW: "60"
       ENVIRONMENT: production
       DEBUG: "false"
       OTP_MOCK: "false"
+      OTP_EXPIRY_MINUTES: "5"
       CORS_ORIGINS: ${CORS_ORIGINS}
       ADMIN_DASHBOARD_KEY: ${ADMIN_DASHBOARD_KEY}
+      UPLOAD_DIR: /app/uploads
+      MAX_FILE_SIZE: "5242880"
+      LOG_LEVEL: INFO
+      LOG_FILE: /var/log/storelink/app.log
       SENTRY_DSN: ${SENTRY_DSN:-}
-      DODO_WEBHOOK_SECRET: ${DODO_WEBHOOK_SECRET:-}
+      DODO_PAYMENTS_API_KEY: ${DODO_PAYMENTS_API_KEY:-}
+      DODO_PAYMENTS_WEBHOOK_KEY: ${DODO_PAYMENTS_WEBHOOK_KEY:-}
+      DODO_PAYMENTS_PRODUCT_ID: ${DODO_PAYMENTS_PRODUCT_ID:-}
+      DODO_PAYMENTS_ENVIRONMENT: ${DODO_PAYMENTS_ENVIRONMENT:-live_mode}
+      DODO_PAYMENTS_RETURN_URL: ${DODO_PAYMENTS_RETURN_URL:-https://storelink.sbs/upgrade-success}
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/var/log/storelink
