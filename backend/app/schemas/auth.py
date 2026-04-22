@@ -102,6 +102,33 @@ class OTPVerifyRequest(BaseModel):
         return v
 
 
+class ResetPasswordRequest(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=15)
+    otp_code: str = Field(..., min_length=6, max_length=6)
+    new_password: str = Field(..., min_length=8, max_length=100)
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        phone = re.sub(r'\D', '', v)
+        if len(phone) < 10:
+            raise ValueError('Phone number must be at least 10 digits')
+        return phone
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not re.search(r'\d', v):
+            raise ValueError('Password must contain at least one digit')
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
+            raise ValueError('Password must contain at least one special character')
+        return v
+
+
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 

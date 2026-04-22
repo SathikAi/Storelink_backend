@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
 from app.database import get_db
 from app.schemas.product import (
     ProductCreateRequest,
@@ -135,7 +135,43 @@ async def upload_product_image(
     )
 
 
-@router.patch("/{product_uuid}/toggle", response_model=ProductToggleResponse)
+@router.post("/{product_uuid}/images", response_model=ProductSingleResponse)
+async def upload_product_images(
+    product_uuid: str,
+    files: List[UploadFile] = File(...),
+    business_id: int = Depends(get_current_business_id),
+    db: Session = Depends(get_db)
+):
+    from app.services.file_upload_service import FileUploadService
+    product_service = ProductService(db)
+    product = product_service.get_product_by_uuid(business_id, product_uuid)
+
+    if len(files) > 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 images allowed")
+
+    new_urls = []
+    for file in files:
+        _, relative_path = await FileUploadService.save_image(file, folder="product_images", max_width=800)
+        new_urls.append(FileUploadService.get_file_url(relative_path))
+
+    current_images = list(product.image_urls or [])
+    current_images.extend(new_urls)
+    product.image_urls = current_images[:10]
+
+    # Always sync image_url with first image
+    if product.image_urls:
+        product.image_url = product.image_urls[0]
+
+    db.commit()
+    db.refresh(product)
+
+    return ProductSingleResponse(
+        message=f"Uploaded {len(new_urls)} image(s) successfully",
+        data=ProductResponse.model_validate(product)
+    )
+
+
+@router.patch("/{product_uuid}/toggle", response_model=ProductSingleResponse)
 async def toggle_product_status(
     product_uuid: str,
     business_id: int = Depends(get_current_business_id),
@@ -143,8 +179,8 @@ async def toggle_product_status(
 ):
     product_service = ProductService(db)
     product = product_service.toggle_product_status(business_id, product_uuid)
-    
-    return ProductToggleResponse(
+
+    return ProductSingleResponse(
         message="Product status toggled successfully",
-        is_active=product.is_active
+        data=ProductResponse.model_validate(product)
     )

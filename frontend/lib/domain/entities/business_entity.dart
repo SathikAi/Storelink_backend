@@ -12,7 +12,11 @@ class BusinessEntity {
   final String? pincode;
   final String? gstin;
   final String? logoUrl;
+  final String? bannerUrl;
+  final List<String>? profileImageUrls;
   final DateTime? planExpiryDate;
+  final String? subscriptionType; // "monthly" | "yearly"
+  final String? upiId;
 
   const BusinessEntity({
     required this.uuid,
@@ -28,6 +32,10 @@ class BusinessEntity {
     this.pincode,
     this.gstin,
     this.logoUrl,
+    this.bannerUrl,
+    this.profileImageUrls,
     this.planExpiryDate,
+    this.subscriptionType,
+    this.upiId,
   });
 }

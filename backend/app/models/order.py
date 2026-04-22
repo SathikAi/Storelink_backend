@@ -38,6 +38,7 @@ class Order(Base):
     payment_method = Column(String(50), nullable=True)
     payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
     notes = Column(Text, nullable=True)
+    payment_proof_url = Column(String(500), nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
     deleted_at = Column(TIMESTAMP, nullable=True)

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'dart:js_interop';
-import 'package:web/web.dart' as web;
+import '../../../core/utils/download_helper.dart' as helper;
 import '../../providers/report_provider.dart';
 import '../../providers/auth_provider.dart';
 
@@ -51,12 +50,10 @@ class _ReportsScreenState extends State<ReportsScreen>
         provider.loadSalesReport(startDate: startDateStr, endDate: endDateStr);
         break;
       case 1:
-        provider.loadProductReport(
-            startDate: startDateStr, endDate: endDateStr);
+        provider.loadProductReport(startDate: startDateStr, endDate: endDateStr);
         break;
       case 2:
-        provider.loadCustomerReport(
-            startDate: startDateStr, endDate: endDateStr);
+        provider.loadCustomerReport(startDate: startDateStr, endDate: endDateStr);
         break;
     }
   }
@@ -111,14 +108,7 @@ class _ReportsScreenState extends State<ReportsScreen>
     if (mounted) Navigator.pop(context);
 
     if (result != null) {
-      final blob = web.Blob([result.bytes.toJS].toJS);
-      final url = web.URL.createObjectURL(blob);
-      final anchor = web.document.createElement('a') as web.HTMLAnchorElement
-        ..href = url
-        ..download = result.filename;
-      anchor.click();
-      web.URL.revokeObjectURL(url);
-
+      await helper.downloadBytes(result.bytes, result.filename);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -145,7 +135,7 @@ class _ReportsScreenState extends State<ReportsScreen>
       builder: (context) => AlertDialog(
         title: const Text('Upgrade Required'),
         content: const Text(
-          'Export functionality is only available for PAID plan users. Upgrade your plan to access this feature.',
+          'Export functionality is only available for PAID plan users.',
         ),
         actions: [
           TextButton(
@@ -155,6 +145,7 @@ class _ReportsScreenState extends State<ReportsScreen>
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
+              context.push('/upgrade');
             },
             child: const Text('Upgrade'),
           ),
@@ -194,14 +185,14 @@ class _ReportsScreenState extends State<ReportsScreen>
       body: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             color: Colors.blue.shade50,
             child: Row(
               children: [
                 const Icon(Icons.date_range, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  '${DateFormat('MMM dd, yyyy').format(_startDate)} - ${DateFormat('MMM dd, yyyy').format(_endDate)}',
+                  '${DateFormat('MMM dd, yyyy').format(_startDate)} – ${DateFormat('MMM dd, yyyy').format(_endDate)}',
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
                 const Spacer(),
@@ -231,33 +222,97 @@ class _ReportsScreenState extends State<ReportsScreen>
     );
   }
 
+  Widget _buildPlanLockedView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.lock_outline, size: 56, color: Colors.amber.shade700),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Reports — PRO Feature',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Unlock detailed sales, product, and customer reports by upgrading to the PRO plan.',
+              style: TextStyle(fontSize: 15, color: Colors.grey[600], height: 1.5),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => context.push('/upgrade'),
+                icon: const Icon(Icons.rocket_launch),
+                label: const Text('Upgrade to PRO', style: TextStyle(fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '₹699/month · Unlimited reports & exports',
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorView(String error, ReportProvider provider) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Error: $error', textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadCurrentReport,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSalesReport() {
     return Consumer<ReportProvider>(
       builder: (context, provider, _) {
         if (provider.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
-
-        if (provider.error != null) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Error: ${provider.error}'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _loadCurrentReport,
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          );
-        }
+        if (provider.isPlanError) return _buildPlanLockedView();
+        if (provider.error != null) return _buildErrorView(provider.error!, provider);
 
         final report = provider.salesReport;
-        if (report == null || report.salesByDate.isEmpty) {
+        if (report == null) {
           return const Center(child: Text('No sales data available'));
         }
+
+        final avgOrder = report.totalOrders > 0
+            ? report.totalRevenue / report.totalOrders
+            : 0.0;
 
         return RefreshIndicator(
           onRefresh: () async => _loadCurrentReport(),
@@ -286,34 +341,84 @@ class _ReportsScreenState extends State<ReportsScreen>
                 ],
               ),
               const SizedBox(height: 16),
-              _buildStatCard(
-                'Average Order Value',
-                '₹${report.averageOrderValue.toStringAsFixed(2)}',
-                Icons.trending_up,
-                Colors.orange,
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      'Avg Order Value',
+                      '₹${avgOrder.toStringAsFixed(2)}',
+                      Icons.trending_up,
+                      Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildStatCard(
+                      'Total Tax',
+                      '₹${report.totalTax.toStringAsFixed(2)}',
+                      Icons.receipt,
+                      Colors.purple,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Sales by Date',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              ...report.salesByDate.map((item) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: const Icon(Icons.calendar_today),
-                      title: Text(DateFormat('MMM dd, yyyy')
-                          .format(DateTime.parse(item.date))),
-                      subtitle: Text('${item.orders} orders'),
-                      trailing: Text(
-                        '₹${item.revenue.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+              if (report.orders.isEmpty)
+                const Center(child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text('No orders in this date range'),
+                ))
+              else ...[
+                const Text(
+                  'Orders',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                ...report.orders.map((item) => Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: item.paymentStatus == 'PAID'
+                          ? Colors.green.shade100
+                          : Colors.grey.shade100,
+                      child: Icon(
+                        item.paymentStatus == 'PAID'
+                            ? Icons.check_circle
+                            : Icons.pending,
+                        color: item.paymentStatus == 'PAID'
+                            ? Colors.green
+                            : Colors.grey,
+                        size: 20,
                       ),
                     ),
-                  )),
+                    title: Text(item.orderNumber,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(
+                      '${item.customerName ?? 'Walk-in'} · ${item.orderDate.substring(0, 10)}',
+                    ),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '₹${item.totalAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        Text(
+                          item.status,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: item.status == 'DELIVERED'
+                                ? Colors.green
+                                : Colors.orange,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )),
+              ],
             ],
           ),
         );
@@ -327,25 +432,11 @@ class _ReportsScreenState extends State<ReportsScreen>
         if (provider.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
-
-        if (provider.error != null) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Error: ${provider.error}'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _loadCurrentReport,
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          );
-        }
+        if (provider.isPlanError) return _buildPlanLockedView();
+        if (provider.error != null) return _buildErrorView(provider.error!, provider);
 
         final report = provider.productReport;
-        if (report == null || report.topProducts.isEmpty) {
+        if (report == null) {
           return const Center(child: Text('No product data available'));
         }
 
@@ -358,8 +449,8 @@ class _ReportsScreenState extends State<ReportsScreen>
                 children: [
                   Expanded(
                     child: _buildStatCard(
-                      'Total Products',
-                      '${report.totalProducts}',
+                      'Products Sold',
+                      '${report.totalProductsSold}',
                       Icons.inventory,
                       Colors.blue,
                     ),
@@ -367,105 +458,49 @@ class _ReportsScreenState extends State<ReportsScreen>
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildStatCard(
-                      'Low Stock',
-                      '${report.lowStockProducts}',
-                      Icons.warning,
-                      Colors.orange,
+                      'Total Revenue',
+                      '₹${report.totalRevenue.toStringAsFixed(2)}',
+                      Icons.account_balance_wallet,
+                      Colors.green,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              _buildStatCard(
-                'Inventory Value',
-                '₹${report.totalInventoryValue.toStringAsFixed(2)}',
-                Icons.account_balance_wallet,
-                Colors.green,
-              ),
               const SizedBox(height: 24),
-              const Text(
-                'Revenue Contribution by Product',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              _buildProductRevenueChart(report.topProducts),
-              const SizedBox(height: 24),
-              const Text(
-                'Top Products Detail',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              ...report.topProducts.map((item) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: const Icon(Icons.shopping_bag),
-                      title: Text(item.productName),
-                      subtitle: Text(
-                        'Sold: ${item.quantitySold} | Stock: ${item.currentStock}',
-                      ),
-                      trailing: Text(
-                        '₹${item.revenue.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+              if (report.products.isEmpty)
+                const Center(child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text('No product sales in this date range'),
+                ))
+              else ...[
+                const Text(
+                  'Product Performance',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                ...report.products.map((item) => Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const CircleAvatar(
+                      child: Icon(Icons.shopping_bag, size: 20),
                     ),
-                  )),
+                    title: Text(item.productName,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(
+                      '${item.categoryName ?? 'Uncategorized'} · ${item.totalQuantitySold} units sold · ${item.ordersCount} orders',
+                    ),
+                    trailing: Text(
+                      '₹${item.totalRevenue.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ),
+                )),
+              ],
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _buildProductRevenueChart(List<dynamic> topProducts) {
-    final colors = [
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.purple,
-      Colors.red,
-      Colors.teal,
-      Colors.amber,
-      Colors.indigo,
-    ];
-
-    return Container(
-      height: 300,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
-            spreadRadius: 2,
-            blurRadius: 5,
-          ),
-        ],
-      ),
-      child: PieChart(
-        PieChartData(
-          sectionsSpace: 2,
-          centerSpaceRadius: 40,
-          sections: topProducts.asMap().entries.map((entry) {
-            final index = entry.key;
-            final product = entry.value;
-            return PieChartSectionData(
-              color: colors[index % colors.length],
-              value: product.revenue as double,
-              title: '${product.productName.substring(0, product.productName.length > 5 ? 5 : product.productName.length)}...',
-              radius: 80,
-              titleStyle: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            );
-          }).toList(),
-        ),
-      ),
     );
   }
 
@@ -475,27 +510,18 @@ class _ReportsScreenState extends State<ReportsScreen>
         if (provider.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
-
-        if (provider.error != null) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Error: ${provider.error}'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _loadCurrentReport,
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          );
-        }
+        if (provider.isPlanError) return _buildPlanLockedView();
+        if (provider.error != null) return _buildErrorView(provider.error!, provider);
 
         final report = provider.customerReport;
-        if (report == null || report.topCustomers.isEmpty) {
+        if (report == null) {
           return const Center(child: Text('No customer data available'));
         }
+
+        final avgOrders = report.totalCustomers > 0
+            ? report.customers.fold<int>(0, (s, c) => s + c.totalOrders) /
+                report.totalCustomers
+            : 0.0;
 
         return RefreshIndicator(
           onRefresh: () async => _loadCurrentReport(),
@@ -515,9 +541,9 @@ class _ReportsScreenState extends State<ReportsScreen>
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildStatCard(
-                      'Active Customers',
-                      '${report.activeCustomers}',
-                      Icons.person,
+                      'Total Revenue',
+                      '₹${report.totalRevenue.toStringAsFixed(2)}',
+                      Icons.attach_money,
                       Colors.green,
                     ),
                   ),
@@ -525,36 +551,44 @@ class _ReportsScreenState extends State<ReportsScreen>
               ),
               const SizedBox(height: 16),
               _buildStatCard(
-                'Avg Orders/Customer',
-                report.averageOrdersPerCustomer.toStringAsFixed(1),
+                'Avg Orders / Customer',
+                avgOrders.toStringAsFixed(1),
                 Icons.trending_up,
                 Colors.orange,
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Top Customers',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              ...report.topCustomers.map((item) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        child: Icon(Icons.person),
-                      ),
-                      title: Text(item.customerName),
-                      subtitle: Text(
-                        '${item.totalOrders} orders${item.phone != null ? ' | ${item.phone}' : ''}',
-                      ),
-                      trailing: Text(
-                        '₹${item.totalSpent.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+              if (report.customers.isEmpty)
+                const Center(child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text('No customer data in this date range'),
+                ))
+              else ...[
+                const Text(
+                  'Top Customers',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                ...report.customers.map((item) => Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const CircleAvatar(
+                      child: Icon(Icons.person),
                     ),
-                  )),
+                    title: Text(item.customerName,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(
+                      '${item.customerPhone}${item.customerEmail != null ? ' · ${item.customerEmail}' : ''}'
+                      '\n${item.totalOrders} orders${item.lastOrderDate != null ? ' · Last: ${item.lastOrderDate!.substring(0, 10)}' : ''}',
+                    ),
+                    isThreeLine: true,
+                    trailing: Text(
+                      '₹${item.totalSpent.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ),
+                )),
+              ],
             ],
           ),
         );
@@ -562,12 +596,7 @@ class _ReportsScreenState extends State<ReportsScreen>
     );
   }
 
-  Widget _buildStatCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Card(
       elevation: 2,
       child: Padding(
@@ -577,13 +606,13 @@ class _ReportsScreenState extends State<ReportsScreen>
           children: [
             Row(
               children: [
-                Icon(icon, color: color, size: 24),
+                Icon(icon, color: color, size: 22),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -591,10 +620,7 @@ class _ReportsScreenState extends State<ReportsScreen>
             const SizedBox(height: 8),
             Text(
               value,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
           ],
         ),

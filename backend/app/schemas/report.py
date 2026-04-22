@@ -1,7 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import date
-from decimal import Decimal
 
 
 class SalesReportItem(BaseModel):
@@ -10,10 +9,10 @@ class SalesReportItem(BaseModel):
     order_date: str
     status: str
     payment_status: str
-    subtotal: Decimal
-    tax_amount: Decimal
-    discount_amount: Decimal
-    total_amount: Decimal
+    subtotal: float
+    tax_amount: float
+    discount_amount: float
+    total_amount: float
 
 
 class SalesReportResponse(BaseModel):
@@ -21,9 +20,9 @@ class SalesReportResponse(BaseModel):
     from_date: Optional[str]
     to_date: Optional[str]
     total_orders: int
-    total_revenue: Decimal
-    total_tax: Decimal
-    total_discount: Decimal
+    total_revenue: float
+    total_tax: float
+    total_discount: float
     orders: List[SalesReportItem]
 
 
@@ -32,7 +31,7 @@ class ProductReportItem(BaseModel):
     product_sku: Optional[str]
     category_name: Optional[str]
     total_quantity_sold: int
-    total_revenue: Decimal
+    total_revenue: float
     orders_count: int
 
 
@@ -41,7 +40,7 @@ class ProductReportResponse(BaseModel):
     from_date: Optional[str]
     to_date: Optional[str]
     total_products_sold: int
-    total_revenue: Decimal
+    total_revenue: float
     products: List[ProductReportItem]
 
 
@@ -50,7 +49,7 @@ class CustomerReportItem(BaseModel):
     customer_phone: str
     customer_email: Optional[str]
     total_orders: int
-    total_spent: Decimal
+    total_spent: float
     last_order_date: Optional[str]
 
 
@@ -59,7 +58,7 @@ class CustomerReportResponse(BaseModel):
     from_date: Optional[str]
     to_date: Optional[str]
     total_customers: int
-    total_revenue: Decimal
+    total_revenue: float
     customers: List[CustomerReportItem]
 
 

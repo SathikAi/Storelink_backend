@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/constants/api_constants.dart';
 
 class AuthApiDatasource {
@@ -15,23 +16,38 @@ class AuthApiDatasource {
     required String businessPhone,
     String? businessEmail,
   }) async {
-    final response = await _dio.post(
-      '${ApiConstants.baseUrl}${ApiConstants.authRegister}',
-      data: {
-        'phone': phone,
-        'password': password,
-        'full_name': fullName,
-        'email': email,
-        'business_name': businessName,
-        'business_phone': businessPhone,
-        'business_email': businessEmail,
-      },
-    );
-
-    if (response.statusCode == 201 && response.data['success']) {
-      return response.data['data'] as Map<String, dynamic>;
-    } else {
-      throw Exception(response.data['detail'] ?? 'Registration failed');
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.baseUrl}${ApiConstants.authRegister}',
+        data: {
+          'phone': phone,
+          'password': password,
+          'full_name': fullName,
+          'email': email,
+          'business_name': businessName,
+          'business_phone': businessPhone,
+          'business_email': businessEmail,
+        },
+      );
+      if (response.statusCode == 201 && response.data['success']) {
+        return response.data['data'] as Map<String, dynamic>;
+      } else {
+        throw Exception(response.data['detail'] ?? 'Registration failed');
+      }
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data != null) {
+        // 422 Pydantic detail is a list or string
+        if (data['detail'] is List) {
+          final msgs = (data['detail'] as List)
+              .map((d) => d['msg']?.toString() ?? '')
+              .where((m) => m.isNotEmpty)
+              .join(', ');
+          throw Exception(msgs.isNotEmpty ? msgs : 'Registration failed');
+        }
+        throw Exception(data['detail']?.toString() ?? 'Registration failed');
+      }
+      throw Exception('[${e.type.name}] ${e.message ?? e.error ?? 'Connection failed'}');
     }
   }
 
@@ -39,18 +55,36 @@ class AuthApiDatasource {
     required String phone,
     required String password,
   }) async {
-    final response = await _dio.post(
-      '${ApiConstants.baseUrl}${ApiConstants.authLogin}',
-      data: {
-        'phone': phone,
-        'password': password,
-      },
-    );
-
-    if (response.statusCode == 200 && response.data['success']) {
-      return response.data['data'] as Map<String, dynamic>;
-    } else {
-      throw Exception(response.data['detail'] ?? 'Login failed');
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.baseUrl}${ApiConstants.authLogin}',
+        data: {
+          'phone': phone,
+          'password': password,
+        },
+      );
+      if (response.statusCode == 200 && response.data['success']) {
+        return response.data['data'] as Map<String, dynamic>;
+      } else {
+        throw Exception(response.data['detail'] ?? 'Login failed');
+      }
+    } on DioException catch (e) {
+      debugPrint('DioException type: ${e.type}');
+      debugPrint('DioException message: ${e.message}');
+      debugPrint('DioException error: ${e.error}');
+      debugPrint('DioException url: ${e.requestOptions.uri}');
+      final data = e.response?.data;
+      if (data != null) {
+        if (data['detail'] is List) {
+          final msgs = (data['detail'] as List)
+              .map((d) => d['msg']?.toString() ?? '')
+              .where((m) => m.isNotEmpty)
+              .join(', ');
+          throw Exception(msgs.isNotEmpty ? msgs : 'Login failed');
+        }
+        throw Exception(data['detail']?.toString() ?? 'Login failed');
+      }
+      throw Exception('[${e.type.name}] ${e.message ?? e.error ?? 'Connection failed'}');
     }
   }
 
@@ -119,6 +153,25 @@ class AuthApiDatasource {
       return response.data['data'] as Map<String, dynamic>;
     } else {
       throw Exception(response.data['detail'] ?? 'Token refresh failed');
+    }
+  }
+
+  Future<void> resetPassword({
+    required String phone,
+    required String newPassword,
+    required String otpCode,
+  }) async {
+    final response = await _dio.post(
+      '${ApiConstants.baseUrl}/auth/reset-password',
+      data: {
+        'phone': phone,
+        'new_password': newPassword,
+        'otp_code': otpCode,
+      },
+    );
+
+    if (response.statusCode != 200 || !response.data['success']) {
+      throw Exception(response.data['detail'] ?? 'Password reset failed');
     }
   }
 }

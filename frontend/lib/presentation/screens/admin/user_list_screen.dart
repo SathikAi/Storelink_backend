@@ -30,7 +30,6 @@ class _UserListScreenState extends State<UserListScreen> {
     final adminProvider = Provider.of<AdminProvider>(context, listen: false);
     
     if (authProvider.accessToken != null) {
-      adminProvider.setToken(authProvider.accessToken!);
       adminProvider.loadUsers(
         page: page,
         search: _searchController.text.isEmpty ? null : _searchController.text,

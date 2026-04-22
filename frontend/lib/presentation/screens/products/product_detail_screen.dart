@@ -61,6 +61,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           backgroundColor: success ? Colors.green : Colors.red,
                         ),
                       );
+                      if (success) {
+                        provider.loadProduct(widget.productUuid);
+                      }
                     } else if (value == 'delete') {
                       _confirmDelete();
                     }
@@ -140,33 +143,47 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: Container(
+                  // Product images carousel
+                  if (product.imageUrls != null && product.imageUrls!.isNotEmpty)
+                    SizedBox(
+                      height: 250,
+                      child: PageView.builder(
+                        itemCount: product.imageUrls!.length,
+                        itemBuilder: (_, i) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              product.imageUrls![i],
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.image_not_supported, size: 48),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
                       width: double.infinity,
                       height: 250,
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
+                        color: Colors.grey[200],
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: product.imageUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                product.imageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.image_not_supported,
-                                  size: 64,
-                                ),
-                              ),
-                            )
-                          : Icon(
-                              Icons.shopping_bag,
-                              size: 64,
-                              color: Colors.grey[600],
-                            ),
+                      child: Icon(Icons.shopping_bag, size: 64, color: Colors.grey[400]),
                     ),
-                  ),
+                  if (product.imageUrls != null && product.imageUrls!.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Swipe to see ${product.imageUrls!.length} photos',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   const SizedBox(height: 24),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,

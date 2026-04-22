@@ -17,7 +17,7 @@ import math
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 
-@router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def create_order(
     data: OrderCreateRequest,
     business_id: int = Depends(get_current_business_id),
@@ -27,7 +27,7 @@ def create_order(
     return service.create_order(business_id, data)
 
 
-@router.get("/", response_model=OrderListResponse)
+@router.get("", response_model=OrderListResponse)
 def get_orders(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),

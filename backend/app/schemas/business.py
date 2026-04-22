@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, date, timezone
 import re
 
@@ -19,7 +19,10 @@ class BusinessProfileResponse(BaseModel):
     state: Optional[str]
     pincode: Optional[str]
     gstin: Optional[str]
+    upi_id: Optional[str] = None
     logo_url: Optional[str]
+    banner_url: Optional[str]
+    profile_image_urls: Optional[List[str]] = []
     plan: str
     plan_expiry_date: Optional[date]
     is_active: bool
@@ -40,6 +43,8 @@ class BusinessUpdateRequest(BaseModel):
     state: Optional[str] = Field(None, max_length=100)
     pincode: Optional[str] = Field(None, max_length=10)
     gstin: Optional[str] = Field(None, max_length=15)
+    upi_id: Optional[str] = Field(None, max_length=100)
+    profile_image_urls: Optional[List[str]] = None
     
     @field_validator('phone')
     @classmethod

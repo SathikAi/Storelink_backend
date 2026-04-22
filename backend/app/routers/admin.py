@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Header
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.database import get_db
 from app.models.user import User
 from app.core.rbac import require_super_admin
+from app.config import settings
 from app.schemas.admin import (
     AdminBusinessListResponse,
     AdminBusinessDetailResponse,
@@ -151,9 +154,40 @@ async def get_platform_statistics(
 ):
     admin_service = AdminService(db)
     stats = admin_service.get_platform_statistics()
-    
+
     return AdminStatsResponse(
         success=True,
         message="Platform statistics retrieved successfully",
         data=stats
     )
+
+
+@router.get("/dashboard-data")
+async def get_dashboard_data(
+    x_admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    plan_filter: Optional[str] = Query(None, alias="plan"),
+    db: Session = Depends(get_db)
+):
+    """API-key-protected endpoint for the standalone admin HTML dashboard."""
+    if not x_admin_key or x_admin_key != settings.ADMIN_DASHBOARD_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin key")
+
+    admin_service = AdminService(db)
+    stats = admin_service.get_platform_statistics()
+    businesses, pagination = admin_service.get_all_businesses(
+        page=page,
+        page_size=page_size,
+        search=search,
+        plan=plan_filter,
+    )
+    recent_users, _ = admin_service.get_all_users(page=1, page_size=10)
+
+    return JSONResponse(jsonable_encoder({
+        "stats": stats.model_dump(),
+        "businesses": [b.model_dump() for b in businesses],
+        "pagination": pagination,
+        "recent_users": [u.model_dump() for u in recent_users],
+    }))

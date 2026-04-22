@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../providers/product_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/shimmer_loading.dart';
 import 'product_form_screen.dart';
 import 'product_detail_screen.dart';
@@ -13,8 +16,8 @@ class ProductsListScreen extends StatefulWidget {
 }
 
 class _ProductsListScreenState extends State<ProductsListScreen> {
-  final ScrollController _scrollController = ScrollController();
-  final TextEditingController _searchController = TextEditingController();
+  final _scrollController = ScrollController();
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -36,47 +39,25 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent * 0.9) {
-      final provider = Provider.of<ProductProvider>(context, listen: false);
-      if (!provider.isLoading && provider.hasMore) {
-        provider.loadProducts();
-      }
+      final p = Provider.of<ProductProvider>(context, listen: false);
+      if (!p.isLoading && p.hasMore) p.loadProducts();
     }
   }
 
-  void _showFilterDialog() {
-    showDialog(
+  void _showFilterSheet() {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filter Products'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('All Products'),
-              onTap: () {
-                Provider.of<ProductProvider>(context, listen: false)
-                    .clearFilters();
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Active Only'),
-              onTap: () {
-                Provider.of<ProductProvider>(context, listen: false)
-                    .setFilters(isActive: true);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Inactive Only'),
-              onTap: () {
-                Provider.of<ProductProvider>(context, listen: false)
-                    .setFilters(isActive: false);
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FilterSheet(
+        onFilter: (isActive) {
+          final p =
+              Provider.of<ProductProvider>(context, listen: false);
+          if (isActive == null) {
+            p.clearFilters();
+          } else {
+            p.setFilters(isActive: isActive);
+          }
+        },
       ),
     );
   }
@@ -84,314 +65,357 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Products'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _showFilterDialog,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search products...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          Provider.of<ProductProvider>(context, listen: false)
-                              .searchProducts('');
-                        },
-                      )
-                    : null,
-                border: const OutlineInputBorder(),
+      backgroundColor: AppColors.background,
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          // ── Header ──
+          SliverAppBar(
+            expandedHeight: 120,
+            pinned: true,
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                  size: 20, color: AppColors.textPrimary),
+              onPressed: () => Navigator.pop(context),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.tune_rounded,
+                    color: AppColors.textPrimary),
+                onPressed: _showFilterSheet,
               ),
-              onChanged: (value) {
-                Provider.of<ProductProvider>(context, listen: false)
-                    .searchProducts(value);
-              },
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding:
+                  const EdgeInsets.only(left: 20, bottom: 16),
+              title: const Text(
+                'Products',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 20,
+                ),
+              ),
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF6C63FF), Color(0xFF3B3ACF)],
+                  ),
+                ),
+              ),
             ),
           ),
-          Expanded(
-            child: Consumer<ProductProvider>(
-              builder: (context, provider, _) {
-                if (provider.isLoading && provider.products.isEmpty) {
-                  return ListView.builder(
-                    itemCount: 6,
-                    itemBuilder: (context, index) => const ShimmerListTile(),
-                  );
-                }
 
-                if (provider.error != null && provider.products.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Error: ${provider.error}'),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () =>
-                              provider.loadProducts(refresh: true),
-                          child: const Text('Retry'),
-                        ),
-                      ],
+          // ── Search bar ──
+          SliverToBoxAdapter(
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (v) => Provider.of<ProductProvider>(
+                        context,
+                        listen: false)
+                    .searchProducts(v),
+                decoration: InputDecoration(
+                  hintText: 'Search products...',
+                  prefixIcon: const Icon(Icons.search_rounded,
+                      color: AppColors.textSecondary, size: 20),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close_rounded,
+                              size: 18, color: AppColors.textSecondary),
+                          onPressed: () {
+                            _searchController.clear();
+                            Provider.of<ProductProvider>(context,
+                                    listen: false)
+                                .searchProducts('');
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: AppColors.inputFill,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                        color: AppColors.primary, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // ── FREE plan upgrade nudge ──
+          SliverToBoxAdapter(
+            child: Consumer2<AuthProvider, ProductProvider>(
+              builder: (context, auth, products, _) {
+                if (auth.isPro) return const SizedBox.shrink();
+                final total = products.products.length;
+                if (total < 8) return const SizedBox.shrink();
+                return GestureDetector(
+                  onTap: () => context.push('/upgrade'),
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF6F00), Color(0xFFFFB300)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                  );
-                }
-
-                if (provider.products.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Row(
                       children: [
-                        Icon(Icons.inventory_2_outlined,
-                            size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No products found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text('Add your first product to get started'),
-                      ],
-                    ),
-                  );
-                }
-
-                return RefreshIndicator(
-                  onRefresh: () => provider.loadProducts(refresh: true),
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: provider.products.length +
-                        (provider.hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == provider.products.length) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: CircularProgressIndicator(),
-                          ),
-                        );
-                      }
-
-                      final product = provider.products[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(12),
-                          leading: product.imageUrl != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    product.imageUrl!,
-                                    width: 60,
-                                    height: 60,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      width: 60,
-                                      height: 60,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[300],
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Icon(Icons.image_not_supported),
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  width: 60,
-                                  height: 60,
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade100,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    Icons.shopping_bag,
-                                    color: Colors.blue.shade700,
-                                    size: 30,
-                                  ),
-                                ),
-                          title: Text(
-                            product.name,
+                        const Icon(Icons.lock_rounded, color: Colors.white, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "You've used $total/10 products — Upgrade to PRO for unlimited",
                             style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Text(
-                                '₹${product.price.toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.green.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: product.isOutOfStock
-                                          ? Colors.red.shade100
-                                          : product.isLowStock
-                                              ? Colors.orange.shade100
-                                              : Colors.green.shade100,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      'Stock: ${product.stockQuantity}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: product.isOutOfStock
-                                            ? Colors.red.shade900
-                                            : product.isLowStock
-                                                ? Colors.orange.shade900
-                                                : Colors.green.shade900,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: product.isActive
-                                          ? Colors.blue.shade100
-                                          : Colors.grey.shade300,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      product.isActive ? 'Active' : 'Inactive',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: product.isActive
-                                            ? Colors.blue.shade900
-                                            : Colors.grey.shade700,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.more_vert),
-                            onPressed: () => _showProductOptions(product.uuid),
-                          ),
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    ProductDetailScreen(productUuid: product.uuid),
-                              ),
-                            );
-                            if (!context.mounted) return;
-                            provider.loadProducts(refresh: true);
-                          },
                         ),
-                      );
-                    },
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Upgrade →',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
             ),
           ),
+
+          // ── Product list ──
+          Consumer<ProductProvider>(
+            builder: (context, provider, _) {
+              if (provider.isLoading && provider.products.isEmpty) {
+                return SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) => const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: ShimmerListTile(),
+                    ),
+                    childCount: 6,
+                  ),
+                );
+              }
+
+              if (provider.error != null && provider.products.isEmpty) {
+                return SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline_rounded,
+                            size: 56, color: AppColors.textSecondary),
+                        const SizedBox(height: 12),
+                        Text(provider.error!,
+                            style: const TextStyle(
+                                color: AppColors.textSecondary),
+                            textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: () =>
+                              provider.loadProducts(refresh: true),
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              if (provider.products.isEmpty) {
+                return SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: const Icon(Icons.inventory_2_rounded,
+                              size: 40, color: AppColors.primary),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No products yet',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Add your first product to get started',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (ctx, i) {
+                    if (i == provider.products.length) {
+                      if (provider.isLoading && provider.hasMore) {
+                        return const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                                color: AppColors.primary),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    }
+                    final product = provider.products[i];
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                      child: _ProductCard(
+                        product: product,
+                        onTap: () async {
+                          await Navigator.push(
+                            ctx,
+                            MaterialPageRoute(
+                              builder: (_) => ProductDetailScreen(
+                                  productUuid: product.uuid),
+                            ),
+                          );
+                          if (!ctx.mounted) return;
+                          provider.loadProducts(refresh: true);
+                        },
+                        onOptions: () =>
+                            _showOptionsSheet(ctx, product.uuid),
+                      ),
+                    );
+                  },
+                  childCount: provider.products.length +
+                      (provider.hasMore ? 1 : 0),
+                ),
+              );
+            },
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: _AnimatedFab(
         onPressed: () async {
           final result = await Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => const ProductFormScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const ProductFormScreen()),
           );
-          if (!context.mounted) return;
+          if (!mounted) return;
           if (result == true) {
+            // ignore: use_build_context_synchronously
             Provider.of<ProductProvider>(context, listen: false)
                 .loadProducts(refresh: true);
           }
         },
-        child: const Icon(Icons.add),
       ),
     );
   }
 
-  void _showProductOptions(String uuid) {
+  void _showOptionsSheet(BuildContext ctx, String uuid) {
     showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('Edit Product'),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _OptionTile(
+              icon: Icons.edit_rounded,
+              label: 'Edit Product',
+              color: AppColors.primary,
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(ctx);
                 final result = await Navigator.push(
-                  context,
+                  ctx,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        ProductFormScreen(productUuid: uuid),
-                  ),
+                      builder: (_) =>
+                          ProductFormScreen(productUuid: uuid)),
                 );
-                if (!context.mounted) return;
+                if (!ctx.mounted) return;
                 if (result == true) {
-                  Provider.of<ProductProvider>(context, listen: false)
+                  Provider.of<ProductProvider>(ctx, listen: false)
                       .loadProducts(refresh: true);
                 }
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.toggle_on),
-              title: const Text('Toggle Status'),
+            _OptionTile(
+              icon: Icons.toggle_on_rounded,
+              label: 'Toggle Active / Inactive',
+              color: AppColors.secondary,
               onTap: () async {
-                Navigator.pop(context);
-                final provider =
-                    Provider.of<ProductProvider>(context, listen: false);
-                final success = await provider.toggleProductStatus(uuid);
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(success
-                        ? 'Product status updated'
-                        : 'Error: ${provider.error}'),
-                    backgroundColor: success ? Colors.green : Colors.red,
-                  ),
-                );
+                Navigator.pop(ctx);
+                final p =
+                    Provider.of<ProductProvider>(ctx, listen: false);
+                final ok = await p.toggleProductStatus(uuid);
+                if (!ctx.mounted) return;
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                  content: Text(
+                      ok ? 'Status updated' : p.error ?? 'Error'),
+                  backgroundColor:
+                      ok ? AppColors.success : AppColors.error,
+                ));
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete Product',
-                  style: TextStyle(color: Colors.red)),
+            _OptionTile(
+              icon: Icons.delete_rounded,
+              label: 'Delete Product',
+              color: AppColors.error,
               onTap: () {
-                Navigator.pop(context);
-                _confirmDelete(uuid);
+                Navigator.pop(ctx);
+                _confirmDelete(ctx, uuid);
               },
             ),
           ],
@@ -400,37 +424,363 @@ class _ProductsListScreenState extends State<ProductsListScreen> {
     );
   }
 
-  void _confirmDelete(String uuid) {
+  void _confirmDelete(BuildContext ctx, String uuid) {
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Product'),
-        content:
-            const Text('Are you sure you want to delete this product?'),
+      context: ctx,
+      builder: (_) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Product',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: const Text(
+            'This product will be permanently deleted. Are you sure?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () async {
-              Navigator.pop(context);
-              final provider =
-                  Provider.of<ProductProvider>(context, listen: false);
-              final success = await provider.deleteProduct(uuid);
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(success
-                      ? 'Product deleted successfully'
-                      : 'Error: ${provider.error}'),
-                  backgroundColor: success ? Colors.green : Colors.red,
-                ),
-              );
+              Navigator.pop(ctx);
+              final p =
+                  Provider.of<ProductProvider>(ctx, listen: false);
+              final ok = await p.deleteProduct(uuid);
+              if (!ctx.mounted) return;
+              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                content: Text(ok
+                    ? 'Product deleted'
+                    : p.error ?? 'Error'),
+                backgroundColor:
+                    ok ? AppColors.success : AppColors.error,
+              ));
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────
+// Product Card
+// ─────────────────────────────────────────
+class _ProductCard extends StatelessWidget {
+  final dynamic product;
+  final VoidCallback onTap;
+  final VoidCallback onOptions;
+  const _ProductCard(
+      {required this.product,
+      required this.onTap,
+      required this.onOptions});
+
+  @override
+  Widget build(BuildContext context) {
+    final stockColor = product.isOutOfStock
+        ? AppColors.error
+        : product.isLowStock
+            ? AppColors.warning
+            : AppColors.success;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Image — use imageUrls[0] if imageUrl is null
+            ClipRRect(
+              borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(18)),
+              child: SizedBox(
+                width: 90,
+                height: 90,
+                child: () {
+                  final imgUrl = (product.imageUrl != null && product.imageUrl!.isNotEmpty)
+                      ? product.imageUrl!
+                      : (product.imageUrls != null && product.imageUrls!.isNotEmpty)
+                          ? product.imageUrls!.first
+                          : null;
+                  return imgUrl != null
+                      ? Image.network(
+                          imgUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _ProductImagePlaceholder(),
+                        )
+                      : _ProductImagePlaceholder();
+                }(),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.name.isNotEmpty ? product.name : '(No name)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '₹${product.price.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _Badge(
+                          label:
+                              'Stock: ${product.stockQuantity}',
+                          color: stockColor,
+                        ),
+                        const SizedBox(width: 6),
+                        _Badge(
+                          label: product.isActive
+                              ? 'Active'
+                              : 'Inactive',
+                          color: product.isActive
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.more_vert_rounded,
+                  color: AppColors.textSecondary),
+              onPressed: onOptions,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductImagePlaceholder extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        color: AppColors.primaryLight,
+        child: const Center(
+          child: Icon(Icons.shopping_bag_rounded,
+              color: AppColors.primary, size: 32),
+        ),
+      );
+}
+
+class _Badge extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _Badge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: color)),
+      );
+}
+
+// ─────────────────────────────────────────
+// Filter Sheet
+// ─────────────────────────────────────────
+class _FilterSheet extends StatelessWidget {
+  final void Function(bool? isActive) onFilter;
+  const _FilterSheet({required this.onFilter});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('Filter Products',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary)),
+          const SizedBox(height: 16),
+          _FilterOption(
+            icon: Icons.all_inclusive_rounded,
+            label: 'All Products',
+            onTap: () {
+              Navigator.pop(context);
+              onFilter(null);
+            },
+          ),
+          _FilterOption(
+            icon: Icons.check_circle_rounded,
+            label: 'Active Only',
+            color: AppColors.success,
+            onTap: () {
+              Navigator.pop(context);
+              onFilter(true);
+            },
+          ),
+          _FilterOption(
+            icon: Icons.cancel_rounded,
+            label: 'Inactive Only',
+            color: AppColors.error,
+            onTap: () {
+              Navigator.pop(context);
+              onFilter(false);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _FilterOption({
+    required this.icon,
+    required this.label,
+    this.color = AppColors.primary,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        title: Text(label,
+            style: const TextStyle(
+                fontWeight: FontWeight.w500, fontSize: 15)),
+        onTap: onTap,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+      );
+}
+
+// ─────────────────────────────────────────
+// Option Tile
+// ─────────────────────────────────────────
+class _OptionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _OptionTile(
+      {required this.icon,
+      required this.label,
+      required this.color,
+      required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        title: Text(label,
+            style: TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
+                color: color == AppColors.error ? AppColors.error : null)),
+        onTap: onTap,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+      );
+}
+
+// ─────────────────────────────────────────
+// Animated FAB
+// ─────────────────────────────────────────
+class _AnimatedFab extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _AnimatedFab({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6C63FF), Color(0xFF4B44CC)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.4),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: FloatingActionButton.extended(
+        onPressed: onPressed,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        label: const Text('Add Product',
+            style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14)),
       ),
     );
   }

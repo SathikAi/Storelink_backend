@@ -33,6 +33,7 @@ class OrderProvider with ChangeNotifier {
       _currentPage = 1;
       _orders.clear();
       _hasMore = true;
+      _isLoading = false; // reset so refresh always proceeds
     }
 
     if (!_hasMore || _isLoading) return;
@@ -73,28 +74,28 @@ class OrderProvider with ChangeNotifier {
     await loadOrders(refresh: true);
   }
 
-  void setFilters({
+  Future<void> setFilters({
     String? status,
     String? paymentStatus,
     String? customerUuid,
     DateTime? fromDate,
     DateTime? toDate,
-  }) {
+  }) async {
     _filterStatus = status;
     _filterPaymentStatus = paymentStatus;
     _filterCustomerUuid = customerUuid;
     _filterFromDate = fromDate;
     _filterToDate = toDate;
-    loadOrders(refresh: true);
+    await loadOrders(refresh: true);
   }
 
-  void clearFilters() {
+  Future<void> clearFilters() async {
     _filterStatus = null;
     _filterPaymentStatus = null;
     _filterCustomerUuid = null;
     _filterFromDate = null;
     _filterToDate = null;
-    loadOrders(refresh: true);
+    await loadOrders(refresh: true);
   }
 
   Future<void> loadOrder(String uuid) async {

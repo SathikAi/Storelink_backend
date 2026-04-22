@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import '../../data/models/product_model.dart';
 import '../../data/repositories/product_repository.dart';
@@ -30,6 +31,7 @@ class ProductProvider with ChangeNotifier {
       _currentPage = 1;
       _products.clear();
       _hasMore = true;
+      _isLoading = false; // reset so refresh always proceeds
     }
 
     if (!_hasMore || _isLoading) return;
@@ -67,16 +69,16 @@ class ProductProvider with ChangeNotifier {
     await loadProducts(refresh: true);
   }
 
-  void setFilters({int? categoryId, bool? isActive}) {
+  Future<void> setFilters({int? categoryId, bool? isActive}) async {
     _filterCategoryId = categoryId;
     _filterIsActive = isActive;
-    loadProducts(refresh: true);
+    await loadProducts(refresh: true);
   }
 
-  void clearFilters() {
+  Future<void> clearFilters() async {
     _filterCategoryId = null;
     _filterIsActive = null;
-    loadProducts(refresh: true);
+    await loadProducts(refresh: true);
   }
 
   Future<void> loadProduct(String uuid) async {
@@ -103,6 +105,7 @@ class ProductProvider with ChangeNotifier {
     try {
       final product = await _repository.createProduct(request);
       _products.insert(0, product);
+      _currentProduct = product;
       _error = null;
       _isLoading = false;
       notifyListeners();
@@ -171,6 +174,35 @@ class ProductProvider with ChangeNotifier {
     try {
       final product =
           await _repository.uploadProductImage(uuid, imageBytes, filename);
+      final index = _products.indexWhere((p) => p.uuid == uuid);
+      if (index != -1) {
+        _products[index] = product;
+      }
+      _currentProduct = product;
+      _error = null;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> uploadProductImages(
+    String uuid,
+    List<Uint8List> imagesBytes,
+    List<String> filenames,
+  ) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final product =
+          await _repository.uploadProductImages(uuid, imagesBytes, filenames);
       final index = _products.indexWhere((p) => p.uuid == uuid);
       if (index != -1) {
         _products[index] = product;

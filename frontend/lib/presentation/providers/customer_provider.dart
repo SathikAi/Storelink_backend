@@ -29,6 +29,7 @@ class CustomerProvider with ChangeNotifier {
       _currentPage = 1;
       _customers.clear();
       _hasMore = true;
+      _isLoading = false; // reset so refresh always proceeds
     }
 
     if (!_hasMore || _isLoading) return;

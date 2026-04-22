@@ -20,7 +20,8 @@ class BusinessApiDatasource {
       ),
     );
 
-    return BusinessModel.fromJson(response.data);
+    // Backend returns BusinessResponse: { success, message, data: {...} }
+    return BusinessModel.fromJson(response.data['data'] as Map<String, dynamic>);
   }
 
   Future<BusinessModel> updateProfile(BusinessUpdateRequest request) async {
@@ -34,7 +35,7 @@ class BusinessApiDatasource {
       ),
     );
 
-    return BusinessModel.fromJson(response.data);
+    return BusinessModel.fromJson(response.data['data'] as Map<String, dynamic>);
   }
 
   Future<BusinessModel> uploadLogo(Uint8List imageBytes, String filename) async {
@@ -55,7 +56,54 @@ class BusinessApiDatasource {
       ),
     );
 
-    return BusinessModel.fromJson(response.data);
+    // Backend now returns BusinessResponse: { success, message, data: {...} }
+    return BusinessModel.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
+  Future<BusinessModel> uploadBanner(Uint8List imageBytes, String filename) async {
+    final token = await _tokenService.getAccessToken();
+
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(
+        imageBytes,
+        filename: filename,
+      ),
+    });
+
+    final response = await _dio.post(
+      '${ApiConstants.baseUrl}${ApiConstants.businessBanner}',
+      data: formData,
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+
+    return BusinessModel.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
+  Future<BusinessModel> uploadImages(List<Uint8List> imagesBytes, List<String> filenames) async {
+    final token = await _tokenService.getAccessToken();
+
+    final formData = FormData();
+    for (int i = 0; i < imagesBytes.length; i++) {
+      formData.files.add(MapEntry(
+        'files',
+        MultipartFile.fromBytes(
+          imagesBytes[i],
+          filename: filenames[i],
+        ),
+      ));
+    }
+
+    final response = await _dio.post(
+      '${ApiConstants.baseUrl}${ApiConstants.businessImages}',
+      data: formData,
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+
+    return BusinessModel.fromJson(response.data['data'] as Map<String, dynamic>);
   }
 
   Future<Map<String, dynamic>> getStats() async {

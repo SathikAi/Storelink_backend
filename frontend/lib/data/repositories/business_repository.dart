@@ -19,6 +19,14 @@ class BusinessRepository {
     return await _apiDatasource.uploadLogo(imageBytes, filename);
   }
 
+  Future<BusinessModel> uploadBanner(Uint8List imageBytes, String filename) async {
+    return await _apiDatasource.uploadBanner(imageBytes, filename);
+  }
+
+  Future<BusinessModel> uploadImages(List<Uint8List> imagesBytes, List<String> filenames) async {
+    return await _apiDatasource.uploadImages(imagesBytes, filenames);
+  }
+
   Future<Map<String, dynamic>> getStats() async {
     return await _apiDatasource.getStats();
   }

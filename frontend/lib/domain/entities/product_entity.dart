@@ -10,6 +10,7 @@ class ProductEntity {
   final int stockQuantity;
   final String? unit;
   final String? imageUrl;
+  final List<String>? imageUrls;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -26,6 +27,7 @@ class ProductEntity {
     required this.stockQuantity,
     this.unit,
     this.imageUrl,
+    this.imageUrls,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,

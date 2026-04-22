@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import '../../providers/product_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../../data/models/product_model.dart';
+import '../../widgets/image_delete_button.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final String? productUuid;
@@ -28,8 +29,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   bool _isActive = true;
   bool _isEditMode = false;
 
-  Uint8List? _selectedImage;
-  String? _selectedImageName;
+  final List<Uint8List> _selectedImages = [];
+  final List<String> _selectedImageNames = [];
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -86,20 +87,31 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   }
 
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      final bytes = await image.readAsBytes();
-      setState(() {
-        _selectedImage = bytes;
-        _selectedImageName = image.name;
-      });
+    if (_selectedImages.length >= 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Maximum 10 images allowed')),
+      );
+      return;
+    }
+
+    final List<XFile> images = await _picker.pickMultiImage();
+    if (images.isNotEmpty) {
+      for (var image in images) {
+        if (_selectedImages.length < 10) {
+          final bytes = await image.readAsBytes();
+          setState(() {
+            _selectedImages.add(bytes);
+            _selectedImageNames.add(image.name);
+          });
+        }
+      }
     }
   }
 
-  Future<void> _uploadImage() async {
-    if (_selectedImage == null || _selectedImageName == null) {
+  Future<void> _uploadImages() async {
+    if (_selectedImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an image first')),
+        const SnackBar(content: Text('Please select images first')),
       );
       return;
     }
@@ -107,26 +119,26 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     if (!_isEditMode || widget.productUuid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Please save the product first before uploading image')),
+            content: Text('Please save the product first before uploading images')),
       );
       return;
     }
 
     final provider = Provider.of<ProductProvider>(context, listen: false);
-    final success = await provider.uploadProductImage(
+    final success = await provider.uploadProductImages(
       widget.productUuid!,
-      _selectedImage!,
-      _selectedImageName!,
+      _selectedImages,
+      _selectedImageNames,
     );
 
     if (mounted) {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Image uploaded successfully')),
+          const SnackBar(content: Text('Images uploaded successfully')),
         );
         setState(() {
-          _selectedImage = null;
-          _selectedImageName = null;
+          _selectedImages.clear();
+          _selectedImageNames.clear();
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -182,6 +194,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         isActive: _isActive,
       );
       success = await provider.createProduct(request);
+
+      // Auto-upload queued images right after product creation
+      if (success && _selectedImages.isNotEmpty && provider.currentProduct != null) {
+        final newUuid = provider.currentProduct!.uuid;
+        final imagesCopy = List<Uint8List>.from(_selectedImages);
+        final namesCopy = List<String>.from(_selectedImageNames);
+        setState(() {
+          _selectedImages.clear();
+          _selectedImageNames.clear();
+        });
+        await provider.uploadProductImages(newUuid, imagesCopy, namesCopy);
+      }
     }
 
     if (mounted) {
@@ -263,67 +287,93 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_isEditMode) ...[
-                      Center(
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: _selectedImage != null
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.memory(
-                                        _selectedImage!,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : provider.currentProduct?.imageUrl != null
-                                      ? ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                          child: Image.network(
-                                            provider.currentProduct!.imageUrl!,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) =>
-                                                const Icon(Icons.image_not_supported,
-                                                    size: 48),
-                                          ),
-                                        )
-                                      : const Icon(Icons.shopping_bag,
-                                          size: 48),
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                    // Product Images — shown in both create and edit mode
+                    Center(
+                      child: Column(
+                        children: [
+                          Text(
+                            _isEditMode ? 'Product Images (Max 10)' : 'Product Images (optional, up to 10)',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 120,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
                               children: [
-                                ElevatedButton.icon(
-                                  onPressed:
-                                      provider.isLoading ? null : _pickImage,
-                                  icon: const Icon(Icons.image),
-                                  label: const Text('Choose Image'),
-                                ),
-                                if (_selectedImage != null) ...[
-                                  const SizedBox(width: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: provider.isLoading
-                                        ? null
-                                        : _uploadImage,
-                                    icon: const Icon(Icons.upload),
-                                    label: const Text('Upload'),
+                                // Existing Images (edit mode only)
+                                if (_isEditMode && provider.currentProduct?.imageUrls != null)
+                                  ...provider.currentProduct!.imageUrls!.map((url) => Padding(
+                                    padding: const EdgeInsets.only(right: 8.0),
+                                    child: Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.network(url, width: 100, height: 100, fit: BoxFit.cover),
+                                        ),
+                                        PositionImageDeleteButton(onDelete: () {
+                                          final newList = List<String>.from(provider.currentProduct!.imageUrls!);
+                                          newList.remove(url);
+                                          provider.updateProduct(widget.productUuid!, ProductUpdateRequest(imageUrls: newList));
+                                        }),
+                                      ],
+                                    ),
+                                  )),
+                                // Newly Selected Images
+                                ..._selectedImages.asMap().entries.map((entry) => Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.memory(entry.value, width: 100, height: 100, fit: BoxFit.cover),
+                                      ),
+                                      PositionImageDeleteButton(onDelete: () {
+                                        setState(() {
+                                          _selectedImages.removeAt(entry.key);
+                                          _selectedImageNames.removeAt(entry.key);
+                                        });
+                                      }),
+                                    ],
                                   ),
-                                ],
+                                )),
+                                // Add Button (up to 10 total)
+                                if ((_isEditMode ? (provider.currentProduct?.imageUrls?.length ?? 0) : 0) + _selectedImages.length < 10)
+                                  GestureDetector(
+                                    onTap: _pickImage,
+                                    child: Container(
+                                      width: 100,
+                                      height: 100,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.grey.shade400, style: BorderStyle.solid),
+                                      ),
+                                      child: const Icon(Icons.add_a_photo, color: Colors.grey),
+                                    ),
+                                  ),
                               ],
                             ),
+                          ),
+                          if (_isEditMode && _selectedImages.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: provider.isLoading ? null : _uploadImages,
+                              icon: const Icon(Icons.upload),
+                              label: Text('Upload ${_selectedImages.length} Images'),
+                            ),
                           ],
-                        ),
+                          if (!_isEditMode && _selectedImages.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              '${_selectedImages.length} image(s) selected — will upload after saving',
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ],
                       ),
-                      const SizedBox(height: 32),
-                    ],
+                    ),
+                    const SizedBox(height: 32),
                     TextFormField(
                       controller: _nameController,
                       decoration: const InputDecoration(
@@ -336,30 +386,41 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     const SizedBox(height: 16),
                     Consumer<CategoryProvider>(
                       builder: (context, categoryProvider, _) {
-                        return DropdownButtonFormField<int>(
-                          initialValue: _selectedCategoryId,
+                        final categoryItems = [
+                          const DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text('No Category'),
+                          ),
+                          ...categoryProvider.categories
+                              .where((c) => c.isActive)
+                              .map((c) => DropdownMenuItem<int?>(
+                                    value: c.id,
+                                    child: Text(c.name),
+                                  )),
+                        ];
+                        // Ensure _selectedCategoryId is valid in the current list
+                        final validIds = categoryProvider.categories
+                            .where((c) => c.isActive)
+                            .map((c) => c.id)
+                            .toSet();
+                        final safeValue = (_selectedCategoryId != null && validIds.contains(_selectedCategoryId))
+                            ? _selectedCategoryId
+                            : null;
+                        return DropdownButtonFormField<int?>(
+                          value: safeValue,
                           decoration: const InputDecoration(
                             labelText: 'Category',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.category),
                           ),
-                          items: [
-                            const DropdownMenuItem<int>(
-                              value: null,
-                              child: Text('No Category'),
-                            ),
-                            ...categoryProvider.categories
-                                .where((c) => c.isActive)
-                                .map((c) => DropdownMenuItem<int>(
-                                      value: c.id,
-                                      child: Text(c.name),
-                                    )),
-                          ],
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedCategoryId = value;
-                            });
-                          },
+                          items: categoryItems,
+                          onChanged: provider.isLoading
+                              ? null
+                              : (value) {
+                                  setState(() {
+                                    _selectedCategoryId = value;
+                                  });
+                                },
                         );
                       },
                     ),
@@ -449,11 +510,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       title: const Text('Active'),
                       subtitle: const Text('Product is available for sale'),
                       value: _isActive,
-                      onChanged: (value) {
-                        setState(() {
-                          _isActive = value;
-                        });
-                      },
+                      onChanged: provider.isLoading
+                          ? null
+                          : (value) {
+                              setState(() {
+                                _isActive = value;
+                              });
+                            },
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
@@ -478,3 +541,4 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     );
   }
 }
+

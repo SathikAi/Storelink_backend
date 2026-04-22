@@ -24,6 +24,7 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     failed_login_attempts = Column(BigInteger, default=0)
     locked_until = Column(TIMESTAMP, nullable=True)
+    last_login = Column(TIMESTAMP, nullable=True)          # updated on every successful login
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
     deleted_at = Column(TIMESTAMP, nullable=True)

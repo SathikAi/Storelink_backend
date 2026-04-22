@@ -41,7 +41,6 @@ class InventoryProvider with ChangeNotifier {
         pageSize: 20,
         search: _searchQuery,
         lowStock: _filterLowStock ? true : null,
-        isActive: true, // Only show active products in inventory by default
       );
 
       if (newProducts.isEmpty) {

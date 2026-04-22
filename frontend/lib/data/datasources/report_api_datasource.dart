@@ -29,8 +29,8 @@ class ReportApiDatasource {
     final response = await _dio.get(
       '${ApiConstants.baseUrl}${ApiConstants.reports}/sales',
       queryParameters: {
-        'start_date': startDate,
-        'end_date': endDate,
+        'from_date': startDate,
+        'to_date': endDate,
       },
       options: Options(
         headers: {'Authorization': 'Bearer $token'},
@@ -49,8 +49,8 @@ class ReportApiDatasource {
     final response = await _dio.get(
       '${ApiConstants.baseUrl}${ApiConstants.reports}/products',
       queryParameters: {
-        'start_date': startDate,
-        'end_date': endDate,
+        'from_date': startDate,
+        'to_date': endDate,
       },
       options: Options(
         headers: {'Authorization': 'Bearer $token'},
@@ -69,8 +69,8 @@ class ReportApiDatasource {
     final response = await _dio.get(
       '${ApiConstants.baseUrl}${ApiConstants.reports}/customers',
       queryParameters: {
-        'start_date': startDate,
-        'end_date': endDate,
+        'from_date': startDate,
+        'to_date': endDate,
       },
       options: Options(
         headers: {'Authorization': 'Bearer $token'},
@@ -91,8 +91,8 @@ class ReportApiDatasource {
       '${ApiConstants.baseUrl}${ApiConstants.reports}/export/pdf',
       queryParameters: {
         'report_type': reportType,
-        'start_date': startDate,
-        'end_date': endDate,
+        'from_date': startDate,
+        'to_date': endDate,
       },
       options: Options(
         headers: {'Authorization': 'Bearer $token'},
@@ -126,8 +126,8 @@ class ReportApiDatasource {
       '${ApiConstants.baseUrl}${ApiConstants.reports}/export/csv',
       queryParameters: {
         'report_type': reportType,
-        'start_date': startDate,
-        'end_date': endDate,
+        'from_date': startDate,
+        'to_date': endDate,
       },
       options: Options(
         headers: {'Authorization': 'Bearer $token'},

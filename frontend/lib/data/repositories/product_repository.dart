@@ -59,6 +59,14 @@ class ProductRepository {
     return await _datasource.uploadProductImage(uuid, imageBytes, filename);
   }
 
+  Future<ProductModel> uploadProductImages(
+    String uuid,
+    List<Uint8List> imagesBytes,
+    List<String> filenames,
+  ) async {
+    return await _datasource.uploadProductImages(uuid, imagesBytes, filenames);
+  }
+
   Future<ProductModel> toggleProductStatus(String uuid) async {
     return await _datasource.toggleProductStatus(uuid);
   }

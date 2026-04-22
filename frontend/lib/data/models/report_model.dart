@@ -2,55 +2,79 @@ import '../../domain/entities/report_entity.dart';
 
 class SalesReportModel extends SalesReportEntity {
   const SalesReportModel({
-    required super.totalRevenue,
+    required super.businessName,
+    super.fromDate,
+    super.toDate,
     required super.totalOrders,
-    required super.averageOrderValue,
-    required super.salesByDate,
+    required super.totalRevenue,
+    required super.totalTax,
+    required super.totalDiscount,
+    required super.orders,
   });
 
   factory SalesReportModel.fromJson(Map<String, dynamic> json) {
     return SalesReportModel(
-      totalRevenue: (json['total_revenue'] as num).toDouble(),
-      totalOrders: json['total_orders'] as int,
-      averageOrderValue: (json['average_order_value'] as num).toDouble(),
-      salesByDate: (json['sales_by_date'] as List)
-          .map((item) => SalesReportItemModel.fromJson(item))
+      businessName: json['business_name'] as String? ?? '',
+      fromDate: json['from_date'] as String?,
+      toDate: json['to_date'] as String?,
+      totalOrders: json['total_orders'] as int? ?? 0,
+      totalRevenue: (json['total_revenue'] as num?)?.toDouble() ?? 0.0,
+      totalTax: (json['total_tax'] as num?)?.toDouble() ?? 0.0,
+      totalDiscount: (json['total_discount'] as num?)?.toDouble() ?? 0.0,
+      orders: ((json['orders'] as List?) ?? [])
+          .map((item) => SalesOrderItemModel.fromJson(item as Map<String, dynamic>))
           .toList(),
     );
   }
 }
 
-class SalesReportItemModel extends SalesReportItem {
-  const SalesReportItemModel({
-    required super.date,
-    required super.revenue,
-    required super.orders,
+class SalesOrderItemModel extends SalesOrderItem {
+  const SalesOrderItemModel({
+    required super.orderNumber,
+    super.customerName,
+    required super.orderDate,
+    required super.status,
+    required super.paymentStatus,
+    required super.subtotal,
+    required super.taxAmount,
+    required super.discountAmount,
+    required super.totalAmount,
   });
 
-  factory SalesReportItemModel.fromJson(Map<String, dynamic> json) {
-    return SalesReportItemModel(
-      date: json['date'] as String,
-      revenue: (json['revenue'] as num).toDouble(),
-      orders: json['orders'] as int,
+  factory SalesOrderItemModel.fromJson(Map<String, dynamic> json) {
+    return SalesOrderItemModel(
+      orderNumber: json['order_number'] as String? ?? '',
+      customerName: json['customer_name'] as String?,
+      orderDate: json['order_date'] as String? ?? '',
+      status: json['status'] as String? ?? '',
+      paymentStatus: json['payment_status'] as String? ?? '',
+      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
+      taxAmount: (json['tax_amount'] as num?)?.toDouble() ?? 0.0,
+      discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0.0,
+      totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
 
 class ProductReportModel extends ProductReportEntity {
   const ProductReportModel({
-    required super.totalProducts,
-    required super.lowStockProducts,
-    required super.totalInventoryValue,
-    required super.topProducts,
+    required super.businessName,
+    super.fromDate,
+    super.toDate,
+    required super.totalProductsSold,
+    required super.totalRevenue,
+    required super.products,
   });
 
   factory ProductReportModel.fromJson(Map<String, dynamic> json) {
     return ProductReportModel(
-      totalProducts: json['total_products'] as int,
-      lowStockProducts: json['low_stock_products'] as int,
-      totalInventoryValue: (json['total_inventory_value'] as num).toDouble(),
-      topProducts: (json['top_products'] as List)
-          .map((item) => ProductReportItemModel.fromJson(item))
+      businessName: json['business_name'] as String? ?? '',
+      fromDate: json['from_date'] as String?,
+      toDate: json['to_date'] as String?,
+      totalProductsSold: json['total_products_sold'] as int? ?? 0,
+      totalRevenue: (json['total_revenue'] as num?)?.toDouble() ?? 0.0,
+      products: ((json['products'] as List?) ?? [])
+          .map((item) => ProductReportItemModel.fromJson(item as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -59,37 +83,44 @@ class ProductReportModel extends ProductReportEntity {
 class ProductReportItemModel extends ProductReportItem {
   const ProductReportItemModel({
     required super.productName,
-    required super.quantitySold,
-    required super.revenue,
-    required super.currentStock,
+    super.productSku,
+    super.categoryName,
+    required super.totalQuantitySold,
+    required super.totalRevenue,
+    required super.ordersCount,
   });
 
   factory ProductReportItemModel.fromJson(Map<String, dynamic> json) {
     return ProductReportItemModel(
-      productName: json['product_name'] as String,
-      quantitySold: json['quantity_sold'] as int,
-      revenue: (json['revenue'] as num).toDouble(),
-      currentStock: json['current_stock'] as int,
+      productName: json['product_name'] as String? ?? '',
+      productSku: json['product_sku'] as String?,
+      categoryName: json['category_name'] as String?,
+      totalQuantitySold: json['total_quantity_sold'] as int? ?? 0,
+      totalRevenue: (json['total_revenue'] as num?)?.toDouble() ?? 0.0,
+      ordersCount: json['orders_count'] as int? ?? 0,
     );
   }
 }
 
 class CustomerReportModel extends CustomerReportEntity {
   const CustomerReportModel({
+    required super.businessName,
+    super.fromDate,
+    super.toDate,
     required super.totalCustomers,
-    required super.activeCustomers,
-    required super.averageOrdersPerCustomer,
-    required super.topCustomers,
+    required super.totalRevenue,
+    required super.customers,
   });
 
   factory CustomerReportModel.fromJson(Map<String, dynamic> json) {
     return CustomerReportModel(
-      totalCustomers: json['total_customers'] as int,
-      activeCustomers: json['active_customers'] as int,
-      averageOrdersPerCustomer:
-          (json['average_orders_per_customer'] as num).toDouble(),
-      topCustomers: (json['top_customers'] as List)
-          .map((item) => CustomerReportItemModel.fromJson(item))
+      businessName: json['business_name'] as String? ?? '',
+      fromDate: json['from_date'] as String?,
+      toDate: json['to_date'] as String?,
+      totalCustomers: json['total_customers'] as int? ?? 0,
+      totalRevenue: (json['total_revenue'] as num?)?.toDouble() ?? 0.0,
+      customers: ((json['customers'] as List?) ?? [])
+          .map((item) => CustomerReportItemModel.fromJson(item as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -98,17 +129,21 @@ class CustomerReportModel extends CustomerReportEntity {
 class CustomerReportItemModel extends CustomerReportItem {
   const CustomerReportItemModel({
     required super.customerName,
+    required super.customerPhone,
+    super.customerEmail,
     required super.totalOrders,
     required super.totalSpent,
-    super.phone,
+    super.lastOrderDate,
   });
 
   factory CustomerReportItemModel.fromJson(Map<String, dynamic> json) {
     return CustomerReportItemModel(
-      customerName: json['customer_name'] as String,
-      totalOrders: json['total_orders'] as int,
-      totalSpent: (json['total_spent'] as num).toDouble(),
-      phone: json['phone'] as String?,
+      customerName: json['customer_name'] as String? ?? '',
+      customerPhone: json['customer_phone'] as String? ?? '',
+      customerEmail: json['customer_email'] as String?,
+      totalOrders: json['total_orders'] as int? ?? 0,
+      totalSpent: (json['total_spent'] as num?)?.toDouble() ?? 0.0,
+      lastOrderDate: json['last_order_date'] as String?,
     );
   }
 }

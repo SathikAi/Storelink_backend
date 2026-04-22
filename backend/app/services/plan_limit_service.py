@@ -7,7 +7,7 @@ from typing import Optional, Dict
 class PlanLimitService:
     
     FREE_PLAN_LIMITS = {
-        "max_products": 10,
+        "max_products": 150,  # 3 categories × 50 products each
         "max_orders": 50,
         "max_customers": 50,
         "features": {
@@ -15,7 +15,9 @@ class PlanLimitService:
             "export_pdf": False,
             "export_csv": False,
             "advanced_dashboard": False,
-            "priority_support": False
+            "priority_support": False,
+            "max_categories": 3,
+            "max_products_per_category": 50,
         }
     }
     
@@ -103,6 +105,30 @@ class PlanLimitService:
         
         return current_count < limit_value, limit_value
     
+    @staticmethod
+    def check_category_limit(db: Session, business_id: int, current_count: int) -> tuple[bool, Optional[int]]:
+        """Returns (can_create, max_categories). None means unlimited."""
+        plan_limit = PlanLimitService.get_or_create_limits(db, business_id)
+        if plan_limit is None:
+            return True, None
+        features = plan_limit.features or {}
+        max_cats = features.get("max_categories")
+        if max_cats is None:
+            return True, None
+        return current_count < max_cats, max_cats
+
+    @staticmethod
+    def check_products_per_category_limit(db: Session, business_id: int, current_count: int) -> tuple[bool, Optional[int]]:
+        """Returns (can_create, max_per_category). None means unlimited."""
+        plan_limit = PlanLimitService.get_or_create_limits(db, business_id)
+        if plan_limit is None:
+            return True, None
+        features = plan_limit.features or {}
+        max_per_cat = features.get("max_products_per_category")
+        if max_per_cat is None:
+            return True, None
+        return current_count < max_per_cat, max_per_cat
+
     @staticmethod
     def check_feature_access(db: Session, business_id: int, feature_name: str) -> bool:
         plan_limit = PlanLimitService.get_or_create_limits(db, business_id)

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, String, Boolean, TIMESTAMP, Enum, Date, ForeignKey, Text
+from sqlalchemy import Column, BigInteger, String, Boolean, TIMESTAMP, Enum, Date, ForeignKey, Text, JSON
 from sqlalchemy.sql import func
 from app.database import Base
 import enum
@@ -25,9 +25,13 @@ class Business(Base):
     state = Column(String(100), nullable=True)
     pincode = Column(String(10), nullable=True)
     gstin = Column(String(15), nullable=True)
+    upi_id = Column(String(100), nullable=True)
     logo_url = Column(String(500), nullable=True)
+    banner_url = Column(String(500), nullable=True)
+    profile_image_urls = Column(JSON, nullable=True, default=list)
     plan = Column(Enum(BusinessPlan), default=BusinessPlan.FREE, index=True)
     plan_expiry_date = Column(Date, nullable=True)
+    subscription_type = Column(String(10), nullable=True)  # "monthly" | "yearly"
     is_active = Column(Boolean, default=True, index=True)
     created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, server_default=func.current_timestamp(), onupdate=func.current_timestamp())

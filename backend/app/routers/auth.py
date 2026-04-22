@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 from app.database import get_db
 from app.schemas.auth import (
     RegisterRequest,
     LoginRequest,
     OTPSendRequest,
     OTPVerifyRequest,
+    ResetPasswordRequest,
     RefreshTokenRequest,
     AuthResponse,
     OTPResponse,
@@ -46,7 +48,10 @@ async def login(data: LoginRequest, db: Session = Depends(get_db)):
     auth_service = AuthService(db)
     user, business = auth_service.login_user(data)
     tokens = auth_service.generate_tokens(user, business)
-    
+
+    user.last_login = datetime.now(timezone.utc)
+    db.commit()
+
     return AuthResponse(
         success=True,
         message="Login successful",
@@ -87,7 +92,11 @@ async def verify_otp(data: OTPVerifyRequest, db: Session = Depends(get_db)):
     if data.purpose == "LOGIN":
         user, business = auth_service.login_with_otp(data)
         tokens = auth_service.generate_tokens(user, business)
-        
+
+        # Track last login timestamp
+        user.last_login = datetime.now(timezone.utc)
+        db.commit()
+
         return AuthResponse(
             success=True,
             message="OTP verified successfully",
@@ -108,6 +117,21 @@ async def verify_otp(data: OTPVerifyRequest, db: Session = Depends(get_db)):
             message="OTP verified successfully",
             data={}
         )
+
+
+@router.post("/reset-password", response_model=AuthResponse)
+async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+    auth_service = AuthService(db)
+    auth_service.reset_password(
+        phone=data.phone,
+        otp_code=data.otp_code,
+        new_password=data.new_password,
+    )
+    return AuthResponse(
+        success=True,
+        message="Password reset successful. Please login with your new password.",
+        data={}
+    )
 
 
 @router.post("/refresh", response_model=AuthResponse)
@@ -145,7 +169,15 @@ async def get_current_user_info(
                 "uuid": business.uuid,
                 "business_name": business.business_name,
                 "plan": business.plan.value,
-                "is_active": business.is_active
+                "is_active": business.is_active,
+                "logo_url": business.logo_url,
+                "banner_url": business.banner_url,
+                "phone": business.phone,
+                "email": business.email,
+                "city": business.city,
+                "state": business.state,
+                "plan_expiry_date": business.plan_expiry_date.isoformat() if business.plan_expiry_date else None,
+                "subscription_type": business.subscription_type,
             } if business else None
         }
     )

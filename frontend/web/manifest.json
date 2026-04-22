@@ -1,11 +1,11 @@
 {
-    "name": "storelink",
-    "short_name": "storelink",
+    "name": "StoreLink Customer Store",
+    "short_name": "StoreLink",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#ffffff",
+    "theme_color": "#2196F3",
+    "description": "Shop directly from your favorite local stores with StoreLink.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

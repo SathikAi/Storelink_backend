@@ -16,15 +16,19 @@ class OrderService:
         self.db = db
     
     def _generate_order_number(self, business_id: int) -> str:
-        today = datetime.now(timezone.utc).strftime("%Y%m%d")
-        
+        import random
+        utc_now = datetime.now(timezone.utc)
+        utc_today = utc_now.date()
+        today = utc_now.strftime("%Y%m%d")
+
         count = self.db.query(func.count(Order.id)).filter(
             Order.business_id == business_id,
-            func.date(Order.order_date) == date.today()
+            func.date(Order.order_date) == utc_today
         ).scalar() or 0
-        
+
         sequence = count + 1
-        return f"ORD{today}{sequence:04d}"
+        rand_suffix = random.randint(0, 9)
+        return f"ORD{today}{sequence:04d}{rand_suffix}"
     
     def create_order(self, business_id: int, data: OrderCreateRequest) -> Order:
         current_count = self.db.query(func.count(Order.id)).filter(

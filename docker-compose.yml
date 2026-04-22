@@ -1,40 +1,43 @@
-version: '3.8'
+version: '3.9'
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: storelink_mysql
+
+  # ── PostgreSQL Database ────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: storelink_db
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: storelink_production
-      MYSQL_USER: storelink_user
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      POSTGRES_DB: storelink
+      POSTGRES_USER: storelink_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - mysql_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
     networks:
-      - storelink_network
+      - storelink_net
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "pg_isready -U storelink_user -d storelink"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # ── Redis (rate limiting / cache) ──────────────────────────
   redis:
     image: redis:7-alpine
     container_name: storelink_redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-changeme}
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     networks:
-      - storelink_network
+      - storelink_net
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # ── Backend (FastAPI) ──────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -42,81 +45,87 @@ services:
     container_name: storelink_backend
     restart: unless-stopped
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: mysql+pymysql://storelink_user:${MYSQL_PASSWORD}@mysql:3306/storelink_production
+      DATABASE_URL: postgresql+psycopg2://storelink_user:${POSTGRES_PASSWORD}@postgres:5432/storelink
       SECRET_KEY: ${SECRET_KEY}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       REDIS_ENABLED: "true"
       RATE_LIMIT_ENABLED: "true"
       ENVIRONMENT: production
       DEBUG: "false"
+      OTP_MOCK: "false"
       CORS_ORIGINS: ${CORS_ORIGINS}
+      ADMIN_DASHBOARD_KEY: ${ADMIN_DASHBOARD_KEY}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      DODO_WEBHOOK_SECRET: ${DODO_WEBHOOK_SECRET:-}
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/var/log/storelink
     networks:
-      - storelink_network
+      - storelink_net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 30s
 
+  # ── Frontend (Flutter Web) ─────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - API_BASE_URL=${API_BASE_URL:-http://localhost/v1}
+        API_BASE_URL: ${API_BASE_URL}
+        WEB_APP_URL: ${WEB_APP_URL}
     container_name: storelink_frontend
     restart: unless-stopped
-    depends_on:
-      - backend
     networks:
-      - storelink_network
+      - storelink_net
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
       interval: 30s
       timeout: 10s
       retries: 3
 
+  # ── Nginx (reverse proxy + SSL) ────────────────────────────
   nginx:
-    image: nginx:alpine
+    image: nginx:1.25-alpine
     container_name: storelink_nginx
     restart: unless-stopped
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./backend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./backend/uploads:/var/www/storelink/uploads:ro
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./backend/uploads:/var/www/uploads:ro
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
     networks:
-      - storelink_network
+      - storelink_net
 
+  # ── Certbot (SSL auto-renew) ───────────────────────────────
   certbot:
     image: certbot/certbot
     container_name: storelink_certbot
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done;'"
 
 volumes:
-  mysql_data:
-    driver: local
+  postgres_data:
   redis_data:
-    driver: local
 
 networks:
-  storelink_network:
+  storelink_net:
     driver: bridge

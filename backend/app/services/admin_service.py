@@ -2,7 +2,7 @@ from typing import List, Dict, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, extract
 from fastapi import HTTPException, status
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from dateutil.relativedelta import relativedelta
 
 from app.models.user import User, UserRole
@@ -92,6 +92,8 @@ class AdminService:
                 email=business.email,
                 plan=business.plan.value,
                 plan_expiry_date=business.plan_expiry_date,
+                subscription_type=business.subscription_type,
+                logo_url=business.logo_url,
                 is_active=business.is_active,
                 created_at=business.created_at,
                 total_products=total_products,
@@ -267,6 +269,7 @@ class AdminService:
                 role=user.role.value,
                 is_active=user.is_active,
                 is_verified=user.is_verified,
+                last_login=user.last_login,
                 created_at=user.created_at,
                 business_count=business_count
             ))
@@ -312,96 +315,143 @@ class AdminService:
         self.db.commit()
     
     def get_platform_statistics(self) -> PlatformStats:
+        now = datetime.now(timezone.utc)
+        month_start  = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        today_start  = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start   = now - timedelta(days=7)
+        month30_start = now - timedelta(days=30)
+
+        # ── Business counts ───────────────────────────────────────────
         total_businesses = self.db.query(func.count(Business.id)).filter(
             Business.deleted_at.is_(None)
         ).scalar() or 0
-        
+
         active_businesses = self.db.query(func.count(Business.id)).filter(
             Business.is_active == True,
             Business.deleted_at.is_(None)
         ).scalar() or 0
-        
-        inactive_businesses = total_businesses - active_businesses
-        
+
         free_plan_businesses = self.db.query(func.count(Business.id)).filter(
             Business.plan == BusinessPlan.FREE,
             Business.deleted_at.is_(None)
         ).scalar() or 0
-        
+
         paid_plan_businesses = self.db.query(func.count(Business.id)).filter(
             Business.plan == BusinessPlan.PAID,
             Business.deleted_at.is_(None)
         ).scalar() or 0
-        
+
+        trial_plan_businesses = self.db.query(func.count(Business.id)).filter(
+            Business.plan == BusinessPlan.PAID,
+            Business.subscription_type == "trial",
+            Business.deleted_at.is_(None)
+        ).scalar() or 0
+
+        # Businesses that have at least 1 order
+        businesses_with_orders = self.db.query(
+            func.count(func.distinct(Order.business_id))
+        ).filter(Order.deleted_at.is_(None)).scalar() or 0
+
+        new_businesses_this_month = self.db.query(func.count(Business.id)).filter(
+            Business.created_at >= month_start,
+            Business.deleted_at.is_(None)
+        ).scalar() or 0
+
+        # ── User counts ───────────────────────────────────────────────
         total_users = self.db.query(func.count(User.id)).filter(
             User.deleted_at.is_(None)
         ).scalar() or 0
-        
+
         active_users = self.db.query(func.count(User.id)).filter(
             User.is_active == True,
             User.deleted_at.is_(None)
         ).scalar() or 0
-        
+
         super_admins = self.db.query(func.count(User.id)).filter(
             User.role == UserRole.SUPER_ADMIN,
             User.deleted_at.is_(None)
         ).scalar() or 0
-        
+
         business_owners = self.db.query(func.count(User.id)).filter(
             User.role == UserRole.BUSINESS_OWNER,
             User.deleted_at.is_(None)
         ).scalar() or 0
-        
+
+        new_users_this_month = self.db.query(func.count(User.id)).filter(
+            User.created_at >= month_start,
+            User.deleted_at.is_(None)
+        ).scalar() or 0
+
+        # ── Login activity (last_login tracking) ─────────────────────
+        active_users_today = self.db.query(func.count(User.id)).filter(
+            User.last_login >= today_start,
+            User.deleted_at.is_(None)
+        ).scalar() or 0
+
+        active_users_week = self.db.query(func.count(User.id)).filter(
+            User.last_login >= week_start,
+            User.deleted_at.is_(None)
+        ).scalar() or 0
+
+        active_users_month = self.db.query(func.count(User.id)).filter(
+            User.last_login >= month30_start,
+            User.deleted_at.is_(None)
+        ).scalar() or 0
+
+        # ── Catalogue & transactions ──────────────────────────────────
         total_products = self.db.query(func.count(Product.id)).filter(
             Product.deleted_at.is_(None)
         ).scalar() or 0
-        
+
         total_orders = self.db.query(func.count(Order.id)).filter(
             Order.deleted_at.is_(None)
         ).scalar() or 0
-        
+
         total_customers = self.db.query(func.count(Customer.id)).filter(
             Customer.deleted_at.is_(None)
         ).scalar() or 0
-        
+
+        # ── Revenue metrics ───────────────────────────────────────────
         total_revenue = self.db.query(func.sum(Order.total_amount)).filter(
             Order.payment_status == "PAID",
             Order.deleted_at.is_(None)
         ).scalar() or 0.0
-        
-        current_month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        
+
         revenue_this_month = self.db.query(func.sum(Order.total_amount)).filter(
             Order.payment_status == "PAID",
-            Order.order_date >= current_month_start,
+            Order.order_date >= month_start,
             Order.deleted_at.is_(None)
         ).scalar() or 0.0
-        
-        new_businesses_this_month = self.db.query(func.count(Business.id)).filter(
-            Business.created_at >= current_month_start,
-            Business.deleted_at.is_(None)
-        ).scalar() or 0
-        
-        new_users_this_month = self.db.query(func.count(User.id)).filter(
-            User.created_at >= current_month_start,
-            User.deleted_at.is_(None)
-        ).scalar() or 0
-        
+
+        # ARPU = total revenue ÷ paid businesses (exclude trial)
+        real_paid = max(paid_plan_businesses - trial_plan_businesses, 0)
+        arpu = float(total_revenue) / real_paid if real_paid > 0 else 0.0
+
+        # Conversion rate = paid (excl trial) ÷ total businesses × 100
+        conversion_rate = round((real_paid / total_businesses * 100), 1) if total_businesses > 0 else 0.0
+
         return PlatformStats(
             total_businesses=total_businesses,
             active_businesses=active_businesses,
-            inactive_businesses=inactive_businesses,
+            inactive_businesses=total_businesses - active_businesses,
             free_plan_businesses=free_plan_businesses,
             paid_plan_businesses=paid_plan_businesses,
+            trial_plan_businesses=trial_plan_businesses,
+            businesses_with_orders=businesses_with_orders,
+            new_businesses_this_month=new_businesses_this_month,
             total_users=total_users,
             active_users=active_users,
             super_admins=super_admins,
             business_owners=business_owners,
+            new_users_this_month=new_users_this_month,
+            active_users_today=active_users_today,
+            active_users_week=active_users_week,
+            active_users_month=active_users_month,
             total_products=total_products,
             total_orders=total_orders,
             total_customers=total_customers,
             total_revenue=float(total_revenue),
             revenue_this_month=float(revenue_this_month),
-            new_businesses_this_month=new_businesses_this_month,
-            new_users_this_month=new_users_this_month
+            arpu=round(arpu, 2),
+            conversion_rate=conversion_rate,
         )

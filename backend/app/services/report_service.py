@@ -1,6 +1,6 @@
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, case
 from datetime import datetime, date
 from decimal import Decimal
 from app.models.order import Order, OrderItem, PaymentStatus, OrderStatus
@@ -182,7 +182,7 @@ class ReportService:
             Order.customer_id,
             func.count(Order.id).label('total_orders'),
             func.sum(
-                func.case(
+                case(
                     (Order.payment_status == PaymentStatus.PAID, Order.total_amount),
                     else_=0
                 )
@@ -204,7 +204,7 @@ class ReportService:
         
         query = query.group_by(Order.customer_id).order_by(
             func.sum(
-                func.case(
+                case(
                     (Order.payment_status == PaymentStatus.PAID, Order.total_amount),
                     else_=0
                 )

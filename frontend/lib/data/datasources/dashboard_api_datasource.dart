@@ -4,6 +4,7 @@ import '../../core/constants/api_constants.dart';
 
 class DashboardApiDatasource {
   final Dio _dio;
+  // ignore: unused_field
   final TokenService _tokenService;
 
   DashboardApiDatasource(this._dio, this._tokenService);
@@ -12,23 +13,28 @@ class DashboardApiDatasource {
     String? fromDate,
     String? toDate,
   }) async {
-    final token = await _tokenService.getAccessToken();
     final queryParams = <String, dynamic>{};
     if (fromDate != null) queryParams['from_date'] = fromDate;
     if (toDate != null) queryParams['to_date'] = toDate;
 
-    final response = await _dio.get(
-      '${ApiConstants.baseUrl}${ApiConstants.dashboardStats}',
-      queryParameters: queryParams.isNotEmpty ? queryParams : null,
-      options: Options(
-        headers: {'Authorization': 'Bearer $token'},
-      ),
-    );
+    try {
+      final response = await _dio.get(
+        '${ApiConstants.baseUrl}${ApiConstants.dashboardStats}',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
 
-    if (response.statusCode == 200 && response.data['success']) {
-      return response.data['data'] as Map<String, dynamic>;
-    } else {
-      throw Exception(response.data['detail'] ?? 'Failed to fetch dashboard stats');
+      if (response.statusCode == 200 && response.data['success']) {
+        return response.data['data'] as Map<String, dynamic>;
+      } else {
+        throw Exception(response.data['detail'] ?? 'Failed to fetch dashboard stats');
+      }
+    } on DioException catch (e) {
+      final code = e.response?.statusCode;
+      if (code == 401 || code == 403) {
+        throw Exception('Session expired. Please log in again.');
+      }
+      final detail = e.response?.data?['detail'];
+      throw Exception(detail?.toString() ?? 'Failed to load dashboard');
     }
   }
 }

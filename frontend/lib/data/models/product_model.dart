@@ -1,4 +1,5 @@
 import '../../domain/entities/product_entity.dart';
+import '../../core/constants/api_constants.dart';
 
 class ProductModel extends ProductEntity {
   const ProductModel({
@@ -13,6 +14,7 @@ class ProductModel extends ProductEntity {
     required super.stockQuantity,
     super.unit,
     super.imageUrl,
+    super.imageUrls,
     required super.isActive,
     required super.createdAt,
     required super.updatedAt,
@@ -36,7 +38,12 @@ class ProductModel extends ProductEntity {
           : null,
       stockQuantity: json['stock_quantity'] as int,
       unit: json['unit'] as String?,
-      imageUrl: json['image_url'] as String?,
+      imageUrl: json['image_url'] != null
+          ? ApiConstants.fullUrl(json['image_url'] as String)
+          : null,
+      imageUrls: (json['image_urls'] as List<dynamic>?)
+          ?.map((e) => ApiConstants.fullUrl(e as String))
+          .toList(),
       isActive: json['is_active'] as bool? ?? true,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -56,6 +63,7 @@ class ProductModel extends ProductEntity {
       'stock_quantity': stockQuantity,
       if (unit != null) 'unit': unit,
       if (imageUrl != null) 'image_url': imageUrl,
+      if (imageUrls != null) 'image_urls': imageUrls,
       'is_active': isActive,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -72,6 +80,7 @@ class ProductCreateRequest {
   final double? costPrice;
   final int stockQuantity;
   final String? unit;
+  final List<String>? imageUrls;
   final bool isActive;
 
   const ProductCreateRequest({
@@ -83,6 +92,7 @@ class ProductCreateRequest {
     this.costPrice,
     this.stockQuantity = 0,
     this.unit,
+    this.imageUrls,
     this.isActive = true,
   });
 
@@ -98,6 +108,7 @@ class ProductCreateRequest {
     if (costPrice != null) data['cost_price'] = costPrice;
     data['stock_quantity'] = stockQuantity;
     if (unit != null && unit!.isNotEmpty) data['unit'] = unit;
+    if (imageUrls != null) data['image_urls'] = imageUrls;
     data['is_active'] = isActive;
     return data;
   }
@@ -112,6 +123,7 @@ class ProductUpdateRequest {
   final double? costPrice;
   final int? stockQuantity;
   final String? unit;
+  final List<String>? imageUrls;
   final bool? isActive;
 
   const ProductUpdateRequest({
@@ -123,6 +135,7 @@ class ProductUpdateRequest {
     this.costPrice,
     this.stockQuantity,
     this.unit,
+    this.imageUrls,
     this.isActive,
   });
 
@@ -136,6 +149,7 @@ class ProductUpdateRequest {
     if (costPrice != null) data['cost_price'] = costPrice;
     if (stockQuantity != null) data['stock_quantity'] = stockQuantity;
     if (unit != null) data['unit'] = unit;
+    if (imageUrls != null) data['image_urls'] = imageUrls;
     if (isActive != null) data['is_active'] = isActive;
     return data;
   }

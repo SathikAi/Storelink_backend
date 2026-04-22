@@ -76,25 +76,71 @@ class BusinessService:
         
         for key, value in update_data.items():
             setattr(business, key, value)
+            
+        # Sync logo_url with first profile image if changed
+        if "profile_image_urls" in update_data and update_data["profile_image_urls"]:
+            business.logo_url = update_data["profile_image_urls"][0]
+        elif "profile_image_urls" in update_data and not update_data["profile_image_urls"]:
+            business.logo_url = None
         
         self.db.commit()
         self.db.refresh(business)
         return business
     
-    async def upload_logo(self, business_id: int, file: UploadFile) -> str:
+    async def upload_logo(self, business_id: int, file: UploadFile) -> Business:
         business = self.get_business_by_id(business_id)
-        
+
         if business.logo_url:
-            old_logo_path = business.logo_url.replace("/uploads/", "")
-            FileUploadService.delete_file(old_logo_path)
-        
-        file_path, relative_path = await FileUploadService.save_image(file, folder="logos", max_width=500)
-        
+            old_path = business.logo_url.replace("/uploads/", "")
+            FileUploadService.delete_file(old_path)
+
+        _, relative_path = await FileUploadService.save_image(file, folder="logos", max_width=500)
         business.logo_url = FileUploadService.get_file_url(relative_path)
+
         self.db.commit()
         self.db.refresh(business)
-        
-        return business.logo_url
+        return business
+
+    async def upload_banner(self, business_id: int, file: UploadFile) -> Business:
+        business = self.get_business_by_id(business_id)
+
+        if business.banner_url:
+            old_path = business.banner_url.replace("/uploads/", "")
+            FileUploadService.delete_file(old_path)
+
+        _, relative_path = await FileUploadService.save_image(file, folder="banners", max_width=1200)
+        business.banner_url = FileUploadService.get_file_url(relative_path)
+
+        self.db.commit()
+        self.db.refresh(business)
+        return business
+
+    async def upload_images(self, business_id: int, files: list) -> Business:
+        business = self.get_business_by_id(business_id)
+
+        if len(files) > 10:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Maximum 10 images allowed per upload"
+            )
+
+        new_urls = []
+        for file in files:
+            _, relative_path = await FileUploadService.save_image(
+                file, folder="profile_images", max_width=800
+            )
+            new_urls.append(FileUploadService.get_file_url(relative_path))
+
+        current = list(business.profile_image_urls or [])
+        current.extend(new_urls)
+        business.profile_image_urls = current[:10]
+
+        if not business.logo_url and business.profile_image_urls:
+            business.logo_url = business.profile_image_urls[0]
+
+        self.db.commit()
+        self.db.refresh(business)
+        return business
     
     def get_business_stats(self, business_id: int) -> Dict:
         business = self.get_business_by_id(business_id)

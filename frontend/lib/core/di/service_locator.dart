@@ -85,6 +85,19 @@ class ServiceLocator {
 
     _tokenService = TokenService();
 
+    // Auto-inject Authorization header on every request
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await _tokenService.getAccessToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          return handler.next(options);
+        },
+      ),
+    );
+
     // Token refresh interceptor: automatically refreshes on 401
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -161,6 +174,9 @@ class ServiceLocator {
     _adminApiDataSource = AdminApiDataSource(client: _dio, tokenService: _tokenService);
     _adminProvider = AdminProvider(_adminApiDataSource);
   }
+
+  Dio get dio => _dio;
+  TokenService get tokenService => _tokenService;
 
   AuthProvider get authProvider => _authProvider;
   DashboardProvider get dashboardProvider => _dashboardProvider;

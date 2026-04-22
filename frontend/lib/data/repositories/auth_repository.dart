@@ -62,7 +62,9 @@ class AuthRepository {
 
       return AuthResult(user: user, business: business, tokens: tokens);
     } catch (e) {
-      throw Exception('Login failed: ${e.toString()}');
+      // Unwrap nested Exception messages to avoid "Login failed: Exception: ..."
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      throw Exception(msg);
     }
   }
 
@@ -141,6 +143,22 @@ class AuthRepository {
   Future<bool> isAuthenticated() async {
     final token = await getAccessToken();
     return token != null;
+  }
+
+  Future<void> resetPassword({
+    required String phone,
+    required String newPassword,
+    required String otpCode,
+  }) async {
+    try {
+      await _apiDatasource.resetPassword(
+        phone: phone,
+        newPassword: newPassword,
+        otpCode: otpCode,
+      );
+    } catch (e) {
+      throw Exception('Password reset failed: ${e.toString()}');
+    }
   }
 }
 

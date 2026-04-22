@@ -138,6 +138,40 @@ class ProductApiDatasource {
     return ProductModel.fromJson(response.data['data']);
   }
 
+  Future<ProductModel> uploadProductImages(
+    String uuid,
+    List<Uint8List> imagesBytes,
+    List<String> filenames,
+  ) async {
+    final token = await _tokenService.getAccessToken();
+
+    final formData = FormData();
+    for (int i = 0; i < imagesBytes.length; i++) {
+      formData.files.add(MapEntry(
+        'files',
+        MultipartFile.fromBytes(
+          imagesBytes[i],
+          filename: filenames[i],
+        ),
+      ));
+    }
+
+    final response = await _dio.post(
+      '${ApiConstants.baseUrl}${ApiConstants.productImages(uuid)}',
+      data: formData,
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+
+    // Backend now returns ProductSingleResponse with a 'data' key
+    final data = response.data['data'];
+    if (data == null) {
+      throw Exception('Image upload response missing product data');
+    }
+    return ProductModel.fromJson(data);
+  }
+
   Future<ProductModel> toggleProductStatus(String uuid) async {
     final token = await _tokenService.getAccessToken();
 

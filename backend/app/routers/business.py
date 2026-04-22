@@ -1,3 +1,4 @@
+from typing import List
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
@@ -7,7 +8,6 @@ from app.schemas.business import (
     BusinessUpdateRequest,
     BusinessStatsResponse,
     BusinessResponse,
-    LogoUploadResponse
 )
 from app.services.business_service import BusinessService
 from app.core.dependencies import get_current_user, get_current_business_id
@@ -47,19 +47,51 @@ async def update_business_profile(
     )
 
 
-@router.post("/logo", response_model=LogoUploadResponse)
+@router.post("/logo", response_model=BusinessResponse)
 async def upload_business_logo(
     file: UploadFile = File(...),
     business_id: int = Depends(get_current_business_id),
     db: Session = Depends(get_db)
 ):
     business_service = BusinessService(db)
-    logo_url = await business_service.upload_logo(business_id, file)
-    
-    return LogoUploadResponse(
+    business = await business_service.upload_logo(business_id, file)
+
+    return BusinessResponse(
         success=True,
         message="Logo uploaded successfully",
-        logo_url=logo_url
+        data=BusinessProfileResponse.model_validate(business)
+    )
+
+
+@router.post("/banner", response_model=BusinessResponse)
+async def upload_business_banner(
+    file: UploadFile = File(...),
+    business_id: int = Depends(get_current_business_id),
+    db: Session = Depends(get_db)
+):
+    business_service = BusinessService(db)
+    business = await business_service.upload_banner(business_id, file)
+
+    return BusinessResponse(
+        success=True,
+        message="Banner uploaded successfully",
+        data=BusinessProfileResponse.model_validate(business)
+    )
+
+
+@router.post("/images", response_model=BusinessResponse)
+async def upload_business_images(
+    files: List[UploadFile] = File(...),
+    business_id: int = Depends(get_current_business_id),
+    db: Session = Depends(get_db)
+):
+    business_service = BusinessService(db)
+    business = await business_service.upload_images(business_id, files)
+
+    return BusinessResponse(
+        success=True,
+        message=f"Images uploaded successfully",
+        data=BusinessProfileResponse.model_validate(business)
     )
 
 

@@ -27,6 +27,7 @@ class AuthProvider extends ChangeNotifier {
   String? get accessToken => _accessToken;
   String? get error => _error;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
+  bool get isPro => _business?.plan.toUpperCase() == 'PAID';
 
   Future<void> checkAuthStatus() async {
     _status = AuthStatus.loading;
@@ -73,9 +74,16 @@ class AuthProvider extends ChangeNotifier {
         businessEmail: businessEmail,
       );
 
+      final token = result.tokens?.accessToken;
+      if (token == null) {
+        _error = 'Authentication failed: no token received';
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return false;
+      }
       _user = result.user;
       _business = result.business;
-      _accessToken = result.tokens?.accessToken;
+      _accessToken = token;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -101,9 +109,16 @@ class AuthProvider extends ChangeNotifier {
         password: password,
       );
 
+      final token = result.tokens?.accessToken;
+      if (token == null) {
+        _error = 'Authentication failed: no token received';
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return false;
+      }
       _user = result.user;
       _business = result.business;
-      _accessToken = result.tokens?.accessToken;
+      _accessToken = token;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -146,9 +161,16 @@ class AuthProvider extends ChangeNotifier {
         purpose: purpose,
       );
 
+      final token = result.tokens?.accessToken;
+      if (token == null) {
+        _error = 'Authentication failed: no token received';
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return false;
+      }
       _user = result.user;
       _business = result.business;
-      _accessToken = result.tokens?.accessToken;
+      _accessToken = token;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -168,6 +190,45 @@ class AuthProvider extends ChangeNotifier {
     _status = AuthStatus.unauthenticated;
     _error = null;
     notifyListeners();
+  }
+
+  Future<bool> resetPassword({
+    required String phone,
+    required String newPassword,
+    required String otpCode,
+  }) async {
+    try {
+      _status = AuthStatus.loading;
+      _error = null;
+      notifyListeners();
+
+      await _authRepository.resetPassword(
+        phone: phone,
+        newPassword: newPassword,
+        otpCode: otpCode,
+      );
+
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Refresh the business data (e.g., after plan upgrade)
+  Future<void> refreshBusiness() async {
+    try {
+      final result = await _authRepository.getCurrentUser();
+      if (result != null) {
+        _user = result.user;
+        _business = result.business;
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   void clearError() {

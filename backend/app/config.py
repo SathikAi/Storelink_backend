@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 5242880
     ALLOWED_IMAGE_TYPES: str = "image/jpeg,image/png,image/webp"
 
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080,http://192.168.137.1:8080,http://192.168.1.38:8080,http://192.168.137.1:8081,http://192.168.1.38:8081"
 
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
@@ -52,6 +52,18 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
     SMTP_FROM: str = "StoreLink <noreply@storelink.com>"
 
+    # ── Dodo Payments ──────────────────────────────────────────────────────
+    DODO_PAYMENTS_API_KEY: str = ""
+    DODO_PAYMENTS_PRODUCT_ID: str = ""          # Legacy / default product
+    DODO_PAYMENTS_PRODUCT_ID_MONTHLY: str = ""  # Monthly ₹699 product
+    DODO_PAYMENTS_PRODUCT_ID_YEARLY: str = ""   # Yearly ₹6999 product
+    DODO_PAYMENTS_WEBHOOK_KEY: str = ""
+    DODO_PAYMENTS_RETURN_URL: str = "http://localhost:9001/v1/billing/upgrade-success"
+    DODO_PAYMENTS_ENVIRONMENT: str = "test_mode"  # "test_mode" | "live_mode"
+
+    # ── Admin Dashboard ────────────────────────────────────────────────────
+    ADMIN_DASHBOARD_KEY: str = "storelink-admin-2024"  # Override in production
+
     @field_validator("SECRET_KEY")
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
@@ -78,6 +90,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 
 settings = Settings()

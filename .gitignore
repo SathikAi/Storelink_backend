@@ -19,3 +19,37 @@ Thumbs.db
 # Secrets
 *.pem
 *.key
+
+# Dependencies
+node_modules/
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+venv/
+__pycache__/
+*.pyc
+
+# Build artifacts
+build/
+dist/
+*.exe
+*.dll
+
+# Logs and debug files
+*.log
+*.txt
+*.png
+*.json
+!package.json
+!composer.json
+!pubspec.json
+!appsettings.json
+!manifest.json
+!api_debug.json # Keep if important, but usually not
+!backend/api_debug.json
+
+# Root artifacts
+nul
+null
+.claude/

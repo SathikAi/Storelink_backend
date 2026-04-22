@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -69,7 +70,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = false);
 
     if (success && mounted) {
-      Navigator.of(context).pushReplacementNamed('/dashboard');
+      context.go('/dashboard');
     } else if (authProvider.error != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -91,11 +92,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
                 Text(
                   'Personal Information',
                   style: Theme.of(context).textTheme.titleLarge,
@@ -151,6 +154,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     labelText: 'Password *',
+                    hintText: 'Min 8 chars, A-Z, a-z, 0-9, @#\$',
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -163,14 +167,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       },
                     ),
                     border: const OutlineInputBorder(),
+                    helperText: 'Must include uppercase, lowercase, number & special char',
+                    helperMaxLines: 2,
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter password';
-                    }
-                    if (value.length < 8) {
-                      return 'Password must be at least 8 characters';
-                    }
+                    if (value == null || value.isEmpty) return 'Please enter password';
+                    if (value.length < 8) return 'Minimum 8 characters';
+                    if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Add at least one uppercase letter (A-Z)';
+                    if (!RegExp(r'[a-z]').hasMatch(value)) return 'Add at least one lowercase letter (a-z)';
+                    if (!RegExp(r'\d').hasMatch(value)) return 'Add at least one number (0-9)';
+                    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value)) return 'Add at least one special character (!@#\$...)';
                     return null;
                   },
                 ),
@@ -264,11 +270,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         )
                       : const Text('Register'),
                 ),
-                const SizedBox(height: 16),
-              ],
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
           ),
         ),
+      ),
       ),
     );
   }

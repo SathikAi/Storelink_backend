@@ -240,12 +240,15 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                         (provider.hasMore ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index >= provider.orders.length) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: CircularProgressIndicator(),
-                          ),
-                        );
+                        if (provider.isLoading && provider.hasMore) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
                       }
 
                       final order = provider.orders[index];

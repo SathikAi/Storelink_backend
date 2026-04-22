@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -17,6 +17,8 @@ class ProductCreateRequest(BaseModel):
     cost_price: Optional[Decimal] = Field(None, ge=0)
     stock_quantity: int = Field(default=0, ge=0)
     unit: Optional[str] = Field(None, max_length=50)
+    image_url: Optional[str] = None
+    image_urls: List[str] = []
     is_active: bool = True
 
 
@@ -29,6 +31,8 @@ class ProductUpdateRequest(BaseModel):
     cost_price: Optional[Decimal] = Field(None, ge=0)
     stock_quantity: Optional[int] = Field(None, ge=0)
     unit: Optional[str] = Field(None, max_length=50)
+    image_url: Optional[str] = None
+    image_urls: Optional[List[str]] = None
     is_active: Optional[bool] = None
 
 
@@ -44,12 +48,19 @@ class ProductResponse(BaseModel):
     stock_quantity: int
     unit: Optional[str]
     image_url: Optional[str]
+    image_urls: List[str] = []
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        from_attributes = True
+
+    model_config = {"from_attributes": True}
+
+    @model_validator(mode='after')
+    def sync_image_url_from_list(self) -> 'ProductResponse':
+        """Ensure image_url is always set if image_urls has items."""
+        if not self.image_url and self.image_urls:
+            self.image_url = self.image_urls[0]
+        return self
 
 
 class ProductListResponse(BaseModel):

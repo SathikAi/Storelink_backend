@@ -17,6 +17,8 @@ class BusinessProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  bool get isPro => _business?.plan.toUpperCase() == 'PAID';
+
   Future<void> loadProfile() async {
     _isLoading = true;
     _error = null;
@@ -59,6 +61,44 @@ class BusinessProvider with ChangeNotifier {
 
     try {
       _business = await _repository.uploadLogo(imageBytes, filename);
+      _error = null;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> uploadBanner(Uint8List imageBytes, String filename) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _business = await _repository.uploadBanner(imageBytes, filename);
+      _error = null;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> uploadImages(List<Uint8List> imagesBytes, List<String> filenames) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _business = await _repository.uploadImages(imagesBytes, filenames);
       _error = null;
       _isLoading = false;
       notifyListeners();

@@ -1,0 +1,101 @@
+version: '3.8'
+
+# Development-only compose file.
+# Usage: docker-compose -f docker-compose.dev.yml up --build
+# - MySQL exposed on 3307 (avoids conflicts with local MySQL)
+# - Redis exposed on 6380 (avoids conflicts with local Redis)
+# - Backend on 8000 with live reload via --reload
+# - No nginx, no certbot, no SSL
+
+services:
+  mysql-dev:
+    image: mysql:8.0
+    container_name: storelink_mysql_dev
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: storelink_dev
+      MYSQL_USER: storelink_user
+      MYSQL_PASSWORD: devpassword
+      MYSQL_ROOT_PASSWORD: devrootpassword
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+    networks:
+      - storelink_dev_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-dev:
+    image: redis:7-alpine
+    container_name: storelink_redis_dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass devredispass
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - storelink_dev_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "devredispass", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend-dev:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: storelink_backend_dev
+    restart: unless-stopped
+    depends_on:
+      mysql-dev:
+        condition: service_healthy
+      redis-dev:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+pymysql://storelink_user:devpassword@mysql-dev:3306/storelink_dev
+      SECRET_KEY: dev-secret-key-minimum-32-chars-storelink-local
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      OTP_EXPIRY_MINUTES: "5"
+      OTP_MOCK: "true"
+      UPLOAD_DIR: uploads
+      MAX_FILE_SIZE: "5242880"
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:8080,http://localhost:5000,http://localhost:5500,http://localhost:4040,http://localhost:8081,http://localhost:9000,http://localhost:9090"
+      ENVIRONMENT: development
+      DEBUG: "true"
+      REDIS_URL: redis://:devredispass@redis-dev:6379/0
+      REDIS_ENABLED: "true"
+      RATE_LIMIT_ENABLED: "false"
+      LOG_LEVEL: DEBUG
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./backend:/app
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/var/log/storelink
+    networks:
+      - storelink_dev_network
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mysql_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+
+networks:
+  storelink_dev_network:
+    driver: bridge

@@ -30,7 +30,6 @@ class _BusinessListScreenState extends State<BusinessListScreen> {
     final adminProvider = Provider.of<AdminProvider>(context, listen: false);
     
     if (authProvider.accessToken != null) {
-      adminProvider.setToken(authProvider.accessToken!);
       adminProvider.loadBusinesses(
         page: page,
         search: _searchController.text.isEmpty ? null : _searchController.text,

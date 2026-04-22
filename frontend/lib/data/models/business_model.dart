@@ -1,4 +1,5 @@
 import '../../domain/entities/business_entity.dart';
+import '../../core/constants/api_constants.dart';
 
 class BusinessModel extends BusinessEntity {
   const BusinessModel({
@@ -15,7 +16,11 @@ class BusinessModel extends BusinessEntity {
     super.pincode,
     super.gstin,
     super.logoUrl,
+    super.bannerUrl,
+    super.profileImageUrls,
     super.planExpiryDate,
+    super.subscriptionType,
+    super.upiId,
   });
 
   factory BusinessModel.fromJson(Map<String, dynamic> json) {
@@ -32,10 +37,20 @@ class BusinessModel extends BusinessEntity {
       state: json['state'] as String?,
       pincode: json['pincode'] as String?,
       gstin: json['gstin'] as String?,
-      logoUrl: json['logo_url'] as String?,
+      logoUrl: json['logo_url'] != null
+          ? ApiConstants.fullUrl(json['logo_url'] as String)
+          : null,
+      bannerUrl: json['banner_url'] != null
+          ? ApiConstants.fullUrl(json['banner_url'] as String)
+          : null,
+      profileImageUrls: (json['profile_image_urls'] as List<dynamic>?)
+          ?.map((e) => ApiConstants.fullUrl(e as String))
+          .toList(),
       planExpiryDate: json['plan_expiry_date'] != null
           ? DateTime.parse(json['plan_expiry_date'] as String)
           : null,
+      subscriptionType: json['subscription_type'] as String?,
+      upiId: json['upi_id'] as String?,
     );
   }
 
@@ -54,8 +69,11 @@ class BusinessModel extends BusinessEntity {
       if (pincode != null) 'pincode': pincode,
       if (gstin != null) 'gstin': gstin,
       if (logoUrl != null) 'logo_url': logoUrl,
+      if (bannerUrl != null) 'banner_url': bannerUrl,
+      if (profileImageUrls != null) 'profile_image_urls': profileImageUrls,
       if (planExpiryDate != null)
         'plan_expiry_date': planExpiryDate!.toIso8601String(),
+      if (upiId != null) 'upi_id': upiId,
     };
   }
 }
@@ -69,6 +87,9 @@ class BusinessUpdateRequest {
   final String? state;
   final String? pincode;
   final String? gstin;
+  final String? bannerUrl;
+  final List<String>? profileImageUrls;
+  final String? upiId;
 
   const BusinessUpdateRequest({
     this.businessType,
@@ -79,6 +100,9 @@ class BusinessUpdateRequest {
     this.state,
     this.pincode,
     this.gstin,
+    this.bannerUrl,
+    this.profileImageUrls,
+    this.upiId,
   });
 
   Map<String, dynamic> toJson() {
@@ -91,6 +115,9 @@ class BusinessUpdateRequest {
     if (state != null) data['state'] = state;
     if (pincode != null) data['pincode'] = pincode;
     if (gstin != null) data['gstin'] = gstin;
+    if (bannerUrl != null) data['banner_url'] = bannerUrl;
+    if (profileImageUrls != null) data['profile_image_urls'] = profileImageUrls;
+    if (upiId != null) data['upi_id'] = upiId;
     return data;
   }
 }

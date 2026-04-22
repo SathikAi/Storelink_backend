@@ -24,19 +24,13 @@ class AdminProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  void setToken(String token) {
-    _token = token;
-  }
-
   Future<void> loadPlatformStats() async {
-    if (_token == null) return;
-
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _platformStats = await _apiDataSource.getPlatformStats(token: _token!);
+      _platformStats = await _apiDataSource.getPlatformStats();
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -53,15 +47,12 @@ class AdminProvider with ChangeNotifier {
     String? plan,
     bool? isActive,
   }) async {
-    if (_token == null) return;
-
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       final data = await _apiDataSource.getBusinesses(
-        token: _token!,
         page: page,
         pageSize: pageSize,
         search: search,
@@ -90,15 +81,12 @@ class AdminProvider with ChangeNotifier {
     String? role,
     bool? isActive,
   }) async {
-    if (_token == null) return;
-
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       final data = await _apiDataSource.getUsers(
-        token: _token!,
         page: page,
         pageSize: pageSize,
         search: search,
@@ -121,11 +109,8 @@ class AdminProvider with ChangeNotifier {
   }
 
   Future<void> updateBusinessStatus(String businessUuid, bool isActive) async {
-    if (_token == null) return;
-
     try {
       await _apiDataSource.updateBusinessStatus(
-        token: _token!,
         businessUuid: businessUuid,
         isActive: isActive,
       );
@@ -142,11 +127,8 @@ class AdminProvider with ChangeNotifier {
     String plan,
     DateTime? planExpiryDate,
   ) async {
-    if (_token == null) return;
-
     try {
       await _apiDataSource.updateBusinessPlan(
-        token: _token!,
         businessUuid: businessUuid,
         plan: plan,
         planExpiryDate: planExpiryDate,
@@ -160,11 +142,8 @@ class AdminProvider with ChangeNotifier {
   }
 
   Future<void> updateUserStatus(String userUuid, bool isActive) async {
-    if (_token == null) return;
-
     try {
       await _apiDataSource.updateUserStatus(
-        token: _token!,
         userUuid: userUuid,
         isActive: isActive,
       );

@@ -26,7 +26,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final adminProvider = Provider.of<AdminProvider>(context, listen: false);
     
     if (authProvider.accessToken != null) {
-      adminProvider.setToken(authProvider.accessToken!);
       adminProvider.loadPlatformStats();
     }
   }

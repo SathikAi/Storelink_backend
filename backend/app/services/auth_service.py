@@ -60,29 +60,36 @@ class AuthService:
         self.db.add(user)
         self.db.flush()
         
+        # 30-day free trial for all new accounts
+        from datetime import date
+        trial_expiry = date.today() + timedelta(days=30)
+
         business = Business(
             owner_id=user.id,
             business_name=data.business_name,
             phone=data.business_phone,
             email=data.business_email,
-            plan=BusinessPlan.FREE,
+            plan=BusinessPlan.PAID,
+            plan_expiry_date=trial_expiry,
+            subscription_type="trial",
             is_active=True
         )
-        
+
         self.db.add(business)
         self.db.flush()
-        
+
+        # Full PRO features during trial
         plan_limit = PlanLimit(
             business_id=business.id,
-            max_products=10,
-            max_orders=50,
-            max_customers=100,
+            max_products=999999,
+            max_orders=999999,
+            max_customers=999999,
             features={
-                "reports_enabled": False,
-                "export_pdf": False,
-                "export_csv": False,
-                "advanced_dashboard": False,
-                "priority_support": False
+                "reports_enabled": True,
+                "export_pdf": True,
+                "export_csv": True,
+                "advanced_dashboard": True,
+                "priority_support": True
             }
         )
         
@@ -146,9 +153,19 @@ class AuthService:
                 Business.owner_id == user.id,
                 Business.deleted_at.is_(None)
             ).first()
-        
+            # Auto-revert expired trials to FREE
+            if business and business.plan == BusinessPlan.PAID and business.subscription_type == "trial":
+                from datetime import date
+                if business.plan_expiry_date and business.plan_expiry_date < date.today():
+                    business.plan = BusinessPlan.FREE
+                    business.subscription_type = None
+                    self.db.commit()
+                    # Downgrade plan limits
+                    from app.services.plan_limit_service import PlanLimitService
+                    PlanLimitService.update_plan_limits(self.db, business.id, BusinessPlan.FREE)
+
         return user, business
-    
+
     def send_otp(self, data: OTPSendRequest) -> OTPVerification:
         self.db.query(OTPVerification).filter(
             OTPVerification.phone == data.phone,
@@ -255,9 +272,19 @@ class AuthService:
                 Business.owner_id == user.id,
                 Business.deleted_at.is_(None)
             ).first()
-        
+            # Auto-revert expired trials to FREE
+            if business and business.plan == BusinessPlan.PAID and business.subscription_type == "trial":
+                from datetime import date
+                if business.plan_expiry_date and business.plan_expiry_date < date.today():
+                    business.plan = BusinessPlan.FREE
+                    business.subscription_type = None
+                    self.db.commit()
+                    # Downgrade plan limits
+                    from app.services.plan_limit_service import PlanLimitService
+                    PlanLimitService.update_plan_limits(self.db, business.id, BusinessPlan.FREE)
+
         return user, business
-    
+
     def generate_tokens(self, user: User, business: Optional[Business] = None) -> Dict[str, str]:
         token_data = {
             "sub": user.uuid,
@@ -305,3 +332,29 @@ class AuthService:
             ).first()
         
         return self.generate_tokens(user, business)
+
+    def reset_password(self, phone: str, otp_code: str, new_password: str) -> bool:
+        from app.schemas.auth import OTPVerifyRequest
+        # Verify the OTP first
+        otp_data = OTPVerifyRequest(phone=phone, otp_code=otp_code, purpose="PASSWORD_RESET")
+        self.verify_otp(otp_data)
+
+        # Find user
+        user = self.db.query(User).filter(
+            User.phone == phone,
+            User.deleted_at.is_(None)
+        ).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found with this phone number"
+            )
+
+        # Update password
+        user.password_hash = hash_password(new_password)
+        # Reset lockout if any
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        self.db.commit()
+        return True

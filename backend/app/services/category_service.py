@@ -5,6 +5,7 @@ from sqlalchemy import func
 from fastapi import HTTPException, status
 from app.models.category import Category
 from app.schemas.category import CategoryCreateRequest, CategoryUpdateRequest
+from app.services.plan_limit_service import PlanLimitService
 
 
 class CategoryService:
@@ -12,12 +13,30 @@ class CategoryService:
         self.db = db
     
     def create_category(self, business_id: int, data: CategoryCreateRequest) -> Category:
+        # Check category limit for FREE plan
+        current_count = self.db.query(func.count(Category.id)).filter(
+            Category.business_id == business_id,
+            Category.deleted_at.is_(None)
+        ).scalar() or 0
+
+        can_create, max_cats = PlanLimitService.check_category_limit(self.db, business_id, current_count)
+        if not can_create:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "CATEGORY_LIMIT_EXCEEDED",
+                    "message": f"Free plan allows only {max_cats} categories. Upgrade to PRO for unlimited.",
+                    "current": current_count,
+                    "limit": max_cats
+                }
+            )
+
         existing = self.db.query(Category).filter(
             Category.business_id == business_id,
             Category.name == data.name,
             Category.deleted_at.is_(None)
         ).first()
-        
+
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
