@@ -1,200 +1,159 @@
 #!/bin/bash
-# StoreLink — Hostinger VPS One-Shot Setup
-# Run this in Hostinger hPanel → VPS → Terminal (browser terminal)
-# Usage: bash vps_setup.sh
+# StoreLink — Hostinger VPS Setup
+# Run: bash vps_setup.sh
 
 set -e
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
-# ── 1. System update + Docker install ─────────────────────────
-info "Updating system..."
-apt-get update -qq && apt-get upgrade -y -qq
+DOMAIN="storelink.sbs"
+REPO="https://github.com/SathikAi/Storelink_backend.git"
 
-info "Installing Docker..."
-curl -fsSL https://get.docker.com | sh
-systemctl enable docker && systemctl start docker
-apt-get install -y -qq git docker-compose-plugin
+# ── 1. Check Docker ────────────────────────────────────────────
+if ! command -v docker &>/dev/null; then
+    info "Installing Docker..."
+    curl -fsSL https://get.docker.com | sh
+    systemctl enable docker && systemctl start docker
+else
+    info "Docker already installed: $(docker --version)"
+fi
 
-# ── 2. Clone repo ──────────────────────────────────────────────
+if ! docker compose version &>/dev/null; then
+    apt-get install -y -qq docker-compose-plugin
+fi
+
+# ── 2. Install git if missing ──────────────────────────────────
+apt-get install -y -qq git curl 2>/dev/null || true
+
+# ── 3. Stop anything on port 80/443 ───────────────────────────
+info "Checking for port conflicts..."
+docker ps -q | xargs -r docker stop 2>/dev/null || true
+# Stop system nginx/apache if running
+systemctl stop nginx apache2 2>/dev/null || true
+
+# ── 4. Clone repo ──────────────────────────────────────────────
 info "Cloning StoreLink..."
 mkdir -p /var/www && cd /var/www
 rm -rf storelink
-git clone https://github.com/SathikAi/Storelink_backend.git storelink
+git clone "$REPO" storelink
 cd storelink
 
-# ── 3. Generate secrets ────────────────────────────────────────
+# ── 5. Generate secrets ────────────────────────────────────────
 SECRET=$(openssl rand -hex 32)
 PG_PASS=$(openssl rand -hex 16)
 REDIS_PASS=$(openssl rand -hex 16)
 ADMIN_KEY=$(openssl rand -hex 16)
-SERVER_IP=$(curl -s ifconfig.me)
 
-# ── 4. Write .env ──────────────────────────────────────────────
-info "Writing .env..."
+# ── 6. Write .env ──────────────────────────────────────────────
+info "Writing .env with domain: $DOMAIN"
 cat > .env <<EOF
-DOMAIN=$SERVER_IP
-API_BASE_URL=http://$SERVER_IP/v1
-WEB_APP_URL=http://$SERVER_IP
+DOMAIN=$DOMAIN
+API_BASE_URL=https://$DOMAIN/v1
+WEB_APP_URL=https://$DOMAIN
 
 POSTGRES_PASSWORD=$PG_PASS
 REDIS_PASSWORD=$REDIS_PASS
 SECRET_KEY=$SECRET
 ADMIN_DASHBOARD_KEY=$ADMIN_KEY
 
-CORS_ORIGINS=http://$SERVER_IP
+CORS_ORIGINS=https://$DOMAIN,https://www.$DOMAIN
 
 DODO_WEBHOOK_SECRET=changeme
 SENTRY_DSN=
 OTP_MOCK=false
 EOF
 
-# ── 5. Create HTTP-only nginx config (no domain/SSL yet) ───────
-info "Writing HTTP nginx config..."
-cat > nginx/nginx.conf <<'NGINX'
-limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s;
-limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/m;
+# ── 7. Patch nginx.conf: replace DOMAIN placeholder ───────────
+info "Configuring nginx for $DOMAIN..."
+sed -i "s/DOMAIN/$DOMAIN/g" nginx/nginx.conf
 
+# ── 8. HTTP-only nginx for certbot challenge ───────────────────
+# Temporarily use a simple HTTP config so certbot can validate
+cat > /tmp/nginx_http_only.conf <<'NGINX'
 server {
     listen 80;
     server_name _;
 
-    client_max_body_size 15M;
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
 
     location / {
-        proxy_pass         http://frontend:80;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_intercept_errors on;
-        error_page 404 = /index.html;
+        return 200 'StoreLink coming soon...';
+        add_header Content-Type text/plain;
     }
-
-    location /admin/ {
-        proxy_pass         http://admin-portal:80/admin/;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-    }
-
-    location /v1/ {
-        proxy_pass         http://backend:8000;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade           $http_upgrade;
-        proxy_set_header   Connection        'upgrade';
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_read_timeout 60s;
-        limit_req zone=api burst=30 nodelay;
-        limit_req_status 429;
-    }
-
-    location ~ ^/v1/auth/(otp|login) {
-        proxy_pass         http://backend:8000;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        limit_req zone=auth burst=5 nodelay;
-        limit_req_status 429;
-    }
-
-    location /admin-dashboard {
-        proxy_pass         http://backend:8000;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-    }
-
-    location /uploads/ {
-        alias   /var/www/uploads/;
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-        access_log off;
-    }
-
-    location /health {
-        proxy_pass http://backend:8000;
-        access_log off;
-    }
-
-    gzip on;
-    gzip_vary on;
-    gzip_proxied any;
-    gzip_comp_level 6;
-    gzip_types text/plain text/css text/xml text/javascript
-               application/json application/javascript application/xml+rss;
 }
 NGINX
 
-# ── 6. Remove SSL-only services from compose for first boot ───
-# (certbot not needed without domain)
-info "Removing certbot from compose for HTTP-only deploy..."
-python3 - <<'PYEOF'
-import re
-with open('docker-compose.yml', 'r') as f:
-    content = f.read()
+# ── 9. Start nginx + certbot to get SSL cert ──────────────────
+info "Starting nginx for SSL certificate..."
+mkdir -p certbot/conf certbot/www backend/uploads backend/logs
 
-# Remove certbot service block
-content = re.sub(
-    r'\n  # ── Certbot.*?entrypoint:.*?\n',
-    '\n',
-    content,
-    flags=re.DOTALL
-)
+# Mount temp HTTP config to get cert
+docker run -d --name temp_nginx \
+    -p 80:80 \
+    -v /tmp/nginx_http_only.conf:/etc/nginx/conf.d/default.conf:ro \
+    -v /var/www/storelink/certbot/www:/var/www/certbot:ro \
+    nginx:1.25-alpine
 
-# Remove certbot volume mounts from nginx
-content = content.replace(
-    '      - ./certbot/conf:/etc/letsencrypt:ro\n', ''
-).replace(
-    '      - ./certbot/www:/var/www/certbot:ro\n', ''
-)
+sleep 3
 
-with open('docker-compose.yml', 'w') as f:
-    f.write(content)
+info "Obtaining SSL certificate for $DOMAIN..."
+docker run --rm \
+    -v /var/www/storelink/certbot/conf:/etc/letsencrypt \
+    -v /var/www/storelink/certbot/www:/var/www/certbot \
+    certbot/certbot certonly \
+    --webroot --webroot-path=/var/www/certbot \
+    --email admin@$DOMAIN \
+    --agree-tos --no-eff-email \
+    -d $DOMAIN -d www.$DOMAIN \
+    --non-interactive
 
-print("docker-compose.yml patched for HTTP-only")
-PYEOF
+docker stop temp_nginx && docker rm temp_nginx
 
-# ── 7. Make directories ────────────────────────────────────────
-mkdir -p backend/uploads backend/logs
+info "SSL certificate obtained!"
 
-# ── 8. Build and start ─────────────────────────────────────────
-info "Building Docker images (this takes 5-10 mins)..."
+# ── 10. Build images ───────────────────────────────────────────
+info "Building Docker images (5-10 mins)..."
 docker compose build
 
-info "Running DB migrations..."
+# ── 11. Run DB migrations ──────────────────────────────────────
+info "Running database migrations..."
 docker compose run --rm backend alembic upgrade head
 
+# ── 12. Start all services ─────────────────────────────────────
 info "Starting all services..."
 docker compose up -d
 
-# ── 9. Health check ────────────────────────────────────────────
-info "Waiting 30s for services to start..."
+# ── 13. Health check ───────────────────────────────────────────
+info "Waiting 30s for services..."
 sleep 30
 
-if curl -sf http://localhost/health > /dev/null 2>&1; then
+if curl -sf https://$DOMAIN/health > /dev/null 2>&1; then
     echo ""
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}✅ StoreLink is LIVE!${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}✅  StoreLink is LIVE!${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo "  App:           http://$SERVER_IP"
-    echo "  API:           http://$SERVER_IP/v1/docs"
-    echo "  Admin Portal:  http://$SERVER_IP/admin/"
-    echo "  Admin (HTML):  http://$SERVER_IP/admin-dashboard"
+    echo "  🌐 App:           https://$DOMAIN"
+    echo "  📡 API Docs:      https://$DOMAIN/v1/docs"
+    echo "  🔧 Admin Portal:  https://$DOMAIN/admin/"
+    echo "  🖥  Admin HTML:    https://$DOMAIN/admin-dashboard"
     echo ""
-    echo "  Admin Key: $ADMIN_KEY"
+    echo "  🔑 Admin Key:     $ADMIN_KEY"
     echo ""
-    echo "  Save these values — you'll need them!"
+    echo "  ⚠️  Save the Admin Key — it won't be shown again!"
     echo ""
 else
-    echo -e "${RED}Health check failed. Check logs:${NC}"
-    docker compose logs backend --tail=30
+    warn "Health check via HTTPS failed, trying HTTP..."
+    if curl -sf http://$DOMAIN/health > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ Live on HTTP (SSL may need a moment)${NC}"
+    else
+        echo -e "${RED}Services not responding. Check logs:${NC}"
+        docker compose logs backend --tail=40
+    fi
 fi
+
+docker compose ps
