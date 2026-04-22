@@ -7,7 +7,6 @@ Create Date: 2026-04-08 15:32:21.553011
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import mysql
 
 revision = '8e97915ad4d0'
 down_revision = '69520d0d831c'
@@ -48,12 +47,12 @@ def downgrade() -> None:
     op.create_index(op.f('ix_users_uuid_unique'), 'users', ['uuid'], unique=True)
     op.create_index(op.f('ix_users_phone_unique'), 'users', ['phone'], unique=True)
     op.create_index(op.f('ix_users_email_unique'), 'users', ['email'], unique=True)
-    op.add_column('products', sa.Column('image_url', mysql.VARCHAR(length=500), nullable=True))
+    op.add_column('products', sa.Column('image_url', sa.String(length=500), nullable=True))
     op.drop_column('products', 'image_urls')
     op.drop_index(op.f('ix_plan_limits_business_id'), table_name='plan_limits')
     op.create_index(op.f('ix_plan_limits_business_id'), 'plan_limits', ['business_id'], unique=False)
     op.drop_column('plan_limits', 'max_profile_images')
     op.drop_column('plan_limits', 'max_product_images')
-    op.add_column('businesses', sa.Column('logo_url', mysql.VARCHAR(length=500), nullable=True))
+    op.add_column('businesses', sa.Column('logo_url', sa.String(length=500), nullable=True))
     op.drop_column('businesses', 'profile_image_urls')
     # ### end Alembic commands ###
