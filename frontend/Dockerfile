@@ -28,9 +28,11 @@ ARG API_BASE_URL=http://localhost/v1
 ARG WEB_APP_URL=http://localhost
 RUN flutter pub get
 RUN flutter build web --release \
-    --pwa-strategy=offline-first \
     --dart-define=API_BASE_URL=${API_BASE_URL} \
     --dart-define=WEB_APP_URL=${WEB_APP_URL}
+
+# Replace Flutter's unregister stub with a real service worker
+COPY web/flutter_service_worker.js /app/build/web/flutter_service_worker.js
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
