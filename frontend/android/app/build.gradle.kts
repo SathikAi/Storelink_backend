@@ -39,7 +39,7 @@ android {
 
     defaultConfig {
         applicationId = "com.storelink.app"
-        minSdk = flutter.minSdkVersion  // Required for flutter_secure_storage EncryptedSharedPreferences
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
