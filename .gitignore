@@ -19,6 +19,9 @@ Thumbs.db
 # Secrets
 *.pem
 *.key
+*.jks
+*.keystore
+key.properties
 
 # Dependencies
 node_modules/
