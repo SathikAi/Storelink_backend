@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/business_entity.dart';
@@ -88,7 +89,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
@@ -123,7 +124,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
@@ -139,7 +140,7 @@ class AuthProvider extends ChangeNotifier {
       await _authRepository.sendOtp(phone: phone, purpose: purpose);
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
       notifyListeners();
       return false;
     }
@@ -175,7 +176,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
@@ -212,7 +213,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
@@ -234,5 +235,30 @@ class AuthProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  String _friendlyError(Object e) {
+    if (e is DioException) {
+      switch (e.type) {
+        case DioExceptionType.connectionError:
+        case DioExceptionType.unknown:
+          return 'Cannot connect to server. Check your internet connection and try again.';
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.receiveTimeout:
+        case DioExceptionType.sendTimeout:
+          return 'Connection timed out. Please try again.';
+        case DioExceptionType.badResponse:
+          final status = e.response?.statusCode;
+          final msg = e.response?.data?['detail'];
+          if (msg != null) return msg.toString();
+          if (status == 401) return 'Invalid phone number or password.';
+          if (status == 400) return 'Invalid details. Please check and try again.';
+          if (status == 409) return 'Account already exists with this phone number.';
+          return 'Server error ($status). Please try again.';
+        default:
+          return 'Something went wrong. Please try again.';
+      }
+    }
+    return 'Something went wrong. Please try again.';
   }
 }
