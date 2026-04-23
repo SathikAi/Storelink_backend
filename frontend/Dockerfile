@@ -25,8 +25,11 @@ COPY . .
 # Build for web with production API base URL
 # Note: In a real CI/CD, you would pass this as an ARG
 ARG API_BASE_URL=http://localhost/v1
+ARG WEB_APP_URL=http://localhost
 RUN flutter pub get
-RUN flutter build web --release --dart-define=API_BASE_URL=${API_BASE_URL}
+RUN flutter build web --release \
+    --dart-define=API_BASE_URL=${API_BASE_URL} \
+    --dart-define=WEB_APP_URL=${WEB_APP_URL}
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
