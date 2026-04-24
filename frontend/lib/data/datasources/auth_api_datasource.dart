@@ -15,19 +15,23 @@ class AuthApiDatasource {
     required String businessName,
     required String businessPhone,
     String? businessEmail,
+    String? referralCode,
   }) async {
     try {
+      final body = {
+        'phone': phone,
+        'password': password,
+        'full_name': fullName,
+        'email': email,
+        'business_name': businessName,
+        'business_phone': businessPhone,
+        'business_email': businessEmail,
+        if (referralCode != null && referralCode.isNotEmpty)
+          'referral_code': referralCode.trim().toUpperCase(),
+      };
       final response = await _dio.post(
         '${ApiConstants.baseUrl}${ApiConstants.authRegister}',
-        data: {
-          'phone': phone,
-          'password': password,
-          'full_name': fullName,
-          'email': email,
-          'business_name': businessName,
-          'business_phone': businessPhone,
-          'business_email': businessEmail,
-        },
+        data: body,
       );
       if (response.statusCode == 201 && response.data['success']) {
         return response.data['data'] as Map<String, dynamic>;

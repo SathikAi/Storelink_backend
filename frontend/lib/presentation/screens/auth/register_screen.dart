@@ -20,6 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _businessNameController = TextEditingController();
   final _businessPhoneController = TextEditingController();
   final _businessEmailController = TextEditingController();
+  final _referralCodeController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
@@ -34,6 +35,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _businessNameController.dispose();
     _businessPhoneController.dispose();
     _businessEmailController.dispose();
+    _referralCodeController.dispose();
     super.dispose();
   }
 
@@ -65,6 +67,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       businessEmail: _businessEmailController.text.trim().isEmpty
           ? null
           : _businessEmailController.text.trim(),
+      referralCode: _referralCodeController.text.trim().isEmpty
+          ? null
+          : _referralCodeController.text.trim(),
     );
 
     setState(() => _isLoading = false);
@@ -254,6 +259,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     labelText: 'Business Email (Optional)',
                     prefixIcon: Icon(Icons.email_outlined),
                     border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _referralCodeController,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    labelText: 'Referral Code (Optional)',
+                    hintText: 'e.g. AB3X7K9Q',
+                    prefixIcon: Icon(Icons.card_giftcard),
+                    border: OutlineInputBorder(),
+                    helperText: 'Get 30 extra free days when your referrer upgrades',
                   ),
                 ),
                 const SizedBox(height: 32),

@@ -16,6 +16,7 @@ class RegisterRequest(BaseModel):
     business_name: str = Field(..., min_length=2, max_length=255)
     business_phone: str = Field(..., min_length=10, max_length=15)
     business_email: Optional[str] = Field(None, max_length=255)
+    referral_code: Optional[str] = Field(None, max_length=12)
     
     @field_validator('password')
     @classmethod

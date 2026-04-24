@@ -94,10 +94,26 @@ class AuthService:
         )
         
         self.db.add(plan_limit)
+
+        # Link referral if a valid code was provided
+        if data.referral_code:
+            from app.models.affiliate import Affiliate, Referral
+            aff = self.db.query(Affiliate).filter(
+                Affiliate.referral_code == data.referral_code.strip().upper(),
+                Affiliate.is_active == True,
+            ).first()
+            if aff:
+                referral = Referral(
+                    affiliate_id=aff.id,
+                    referred_business_id=business.id,
+                )
+                aff.total_referrals += 1
+                self.db.add(referral)
+
         self.db.commit()
         self.db.refresh(user)
         self.db.refresh(business)
-        
+
         return user, business
     
     def login_user(self, data: LoginRequest) -> Tuple[User, Optional[Business]]:

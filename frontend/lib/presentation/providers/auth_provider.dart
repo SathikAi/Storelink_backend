@@ -98,6 +98,7 @@ class AuthProvider extends ChangeNotifier {
     required String businessName,
     required String businessPhone,
     String? businessEmail,
+    String? referralCode,
   }) async {
     try {
       _status = AuthStatus.loading;
@@ -112,6 +113,7 @@ class AuthProvider extends ChangeNotifier {
         businessName: businessName,
         businessPhone: businessPhone,
         businessEmail: businessEmail,
+        referralCode: referralCode,
       );
 
       final token = result.tokens?.accessToken;

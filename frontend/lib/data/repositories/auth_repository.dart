@@ -18,6 +18,7 @@ class AuthRepository {
     required String businessName,
     required String businessPhone,
     String? businessEmail,
+    String? referralCode,
   }) async {
     try {
       final data = await _apiDatasource.register(
@@ -28,6 +29,7 @@ class AuthRepository {
         businessName: businessName,
         businessPhone: businessPhone,
         businessEmail: businessEmail,
+        referralCode: referralCode,
       );
 
       final user = UserModel.fromJson(data['user']);
