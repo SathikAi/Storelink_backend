@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
-import 'otp_screen.dart';
 import 'forgot_password_screen.dart';
+import 'google_register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -71,29 +71,30 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  Future<void> _loginWithOtp() async {
-    if (_phoneController.text.trim().isEmpty) {
-      _showError('Phone number enter pannunga');
-      return;
-    }
+  Future<void> _loginWithGoogle() async {
     setState(() => _isLoading = true);
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    final success = await auth.sendOtp(
-      phone: _phoneController.text.trim(),
-      purpose: 'LOGIN',
-    );
+    final result = await auth.loginWithGoogle();
     if (!mounted) return;
     setState(() => _isLoading = false);
-    if (success) {
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => OtpScreen(
-          phone: _phoneController.text.trim(),
-          purpose: 'LOGIN',
-        ),
-      ));
-    } else if (auth.error != null) {
-      _showError(auth.error!);
-      auth.clearError();
+
+    switch (result['status']) {
+      case 'logged_in':
+        context.go('/dashboard');
+        break;
+      case 'needs_registration':
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => GoogleRegisterScreen(
+            googleEmail: result['email'] ?? '',
+            googleName: result['name'] ?? '',
+            supabaseToken: result['token'] ?? '',
+          ),
+        ));
+        break;
+      case 'cancelled':
+        break;
+      default:
+        _showError(result['message'] ?? 'Google sign-in failed');
     }
   }
 
@@ -296,18 +297,24 @@ class _LoginScreenState extends State<LoginScreen>
                                   label: 'Sign In',
                                 ),
                                 const SizedBox(height: 14),
-                                // OTP button
+                                // Google Sign-In button
                                 SizedBox(
                                   width: double.infinity,
                                   height: 52,
                                   child: OutlinedButton.icon(
-                                    onPressed: _isLoading ? null : _loginWithOtp,
-                                    icon: const Icon(Icons.sms_rounded, size: 18),
-                                    label: const Text('Sign In with OTP'),
+                                    onPressed: _isLoading ? null : _loginWithGoogle,
+                                    icon: Image.network(
+                                      'https://developers.google.com/identity/images/g-logo.png',
+                                      height: 20,
+                                      width: 20,
+                                      errorBuilder: (_, __, ___) =>
+                                          const Icon(Icons.login, size: 18),
+                                    ),
+                                    label: const Text('Sign In with Google'),
                                     style: OutlinedButton.styleFrom(
-                                      foregroundColor: AppColors.primary,
+                                      foregroundColor: const Color(0xFF444444),
                                       side: const BorderSide(
-                                          color: AppColors.primary, width: 1.5),
+                                          color: Color(0xFFDDDDDD), width: 1.5),
                                       shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(16)),
                                       textStyle: const TextStyle(

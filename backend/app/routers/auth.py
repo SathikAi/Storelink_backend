@@ -190,3 +190,177 @@ async def logout(current_user: User = Depends(get_current_user)):
         message="Logged out successfully",
         data={}
     )
+
+
+@router.post("/google", response_model=AuthResponse)
+async def google_auth(payload: dict, db: Session = Depends(get_db)):
+    """
+    Called after Supabase Google OAuth. Accepts the Supabase access token,
+    verifies it, then finds or creates a user in our DB.
+    Returns our JWT if user exists, or needs_registration=true for new users.
+    """
+    import httpx
+    supabase_token = payload.get("supabase_token", "")
+    if not supabase_token:
+        raise HTTPException(status_code=400, detail="supabase_token required")
+
+    # Verify token with Supabase and get user info
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            "https://oviksvysiiktbgqllkzn.supabase.co/auth/v1/user",
+            headers={"Authorization": f"Bearer {supabase_token}",
+                     "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92aWtzdnlzaWlrdGJncWxsa3puIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjkwNjksImV4cCI6MjA5MjQ0NTA2OX0.GkUUE534J8wdsOYhnt81IvZpiolDV3c186Kw1w211eU"},
+            timeout=10,
+        )
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid Supabase token")
+
+    sb_user = resp.json()
+    google_email = sb_user.get("email", "")
+    google_name = sb_user.get("user_metadata", {}).get("full_name") or \
+                  sb_user.get("user_metadata", {}).get("name") or ""
+
+    if not google_email:
+        raise HTTPException(status_code=400, detail="Google account has no email")
+
+    # Find existing user by email
+    from app.models.business import Business
+    user = db.query(User).filter(
+        User.email == google_email,
+        User.deleted_at.is_(None)
+    ).first()
+
+    if user:
+        # Existing user — return our JWT
+        business = db.query(Business).filter(
+            Business.owner_id == user.id,
+            Business.deleted_at.is_(None)
+        ).first()
+        auth_service = AuthService(db)
+        tokens = auth_service.generate_tokens(user, business)
+        user.last_login = datetime.now(timezone.utc)
+        db.commit()
+        return AuthResponse(
+            success=True,
+            message="Login successful",
+            data={
+                "user": UserResponse.model_validate(user).model_dump(),
+                "business": {
+                    "uuid": business.uuid,
+                    "business_name": business.business_name,
+                    "plan": business.plan.value,
+                } if business else None,
+                "tokens": tokens,
+            }
+        )
+
+    # New Google user — send back info so Flutter can show registration form
+    return AuthResponse(
+        success=True,
+        message="needs_registration",
+        data={
+            "needs_registration": True,
+            "google_email": google_email,
+            "google_name": google_name,
+            "supabase_token": supabase_token,
+        }
+    )
+
+
+@router.post("/google/complete", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+async def google_complete_registration(payload: dict, db: Session = Depends(get_db)):
+    """
+    Completes registration for new Google sign-in users.
+    Requires: supabase_token, phone, business_name, business_phone
+    """
+    import httpx, re
+    from datetime import timedelta, date
+    from app.models.business import Business, BusinessPlan
+    from app.models.plan_limit import PlanLimit
+    from app.core.security import hash_password
+    import secrets, string
+
+    supabase_token = payload.get("supabase_token", "")
+    phone = re.sub(r"\D", "", payload.get("phone", ""))
+    business_name = payload.get("business_name", "").strip()
+    business_phone = re.sub(r"\D", "", payload.get("business_phone", phone))
+
+    if not all([supabase_token, phone, business_name]):
+        raise HTTPException(status_code=400, detail="phone and business_name required")
+
+    # Re-verify Supabase token
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            "https://oviksvysiiktbgqllkzn.supabase.co/auth/v1/user",
+            headers={"Authorization": f"Bearer {supabase_token}",
+                     "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92aWtzdnlzaWlrdGJncWxsa3puIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjkwNjksImV4cCI6MjA5MjQ0NTA2OX0.GkUUE534J8wdsOYhnt81IvZpiolDV3c186Kw1w211eU"},
+            timeout=10,
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid Supabase token")
+
+    sb_user = resp.json()
+    google_email = sb_user.get("email", "")
+    google_name = sb_user.get("user_metadata", {}).get("full_name") or \
+                  sb_user.get("user_metadata", {}).get("name") or business_name
+
+    # Check phone not taken
+    if db.query(User).filter(User.phone == phone, User.deleted_at.is_(None)).first():
+        raise HTTPException(status_code=400, detail="Phone number already registered")
+
+    # Create user with random password (Google users don't use password login)
+    rand_pw = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
+    user = User(
+        phone=phone,
+        email=google_email,
+        password_hash=hash_password(rand_pw),
+        full_name=google_name,
+        role="BUSINESS_OWNER",
+        is_active=True,
+        is_verified=True,
+    )
+    db.add(user)
+    db.flush()
+
+    trial_expiry = date.today() + timedelta(days=30)
+    business = Business(
+        owner_id=user.id,
+        business_name=business_name,
+        phone=business_phone or phone,
+        email=google_email,
+        plan=BusinessPlan.PAID,
+        plan_expiry_date=trial_expiry,
+        subscription_type="trial",
+        is_active=True,
+    )
+    db.add(business)
+    db.flush()
+
+    plan_limit = PlanLimit(
+        business_id=business.id,
+        max_products=999999, max_orders=999999, max_customers=999999,
+        features={"reports_enabled": True, "export_pdf": True, "export_csv": True,
+                  "advanced_dashboard": True, "priority_support": True},
+    )
+    db.add(plan_limit)
+    db.commit()
+    db.refresh(user)
+    db.refresh(business)
+
+    auth_service = AuthService(db)
+    tokens = auth_service.generate_tokens(user, business)
+
+    return AuthResponse(
+        success=True,
+        message="Registration successful",
+        data={
+            "user": UserResponse.model_validate(user).model_dump(),
+            "business": {
+                "uuid": business.uuid,
+                "business_name": business.business_name,
+                "plan": business.plan.value,
+            },
+            "tokens": tokens,
+        }
+    )

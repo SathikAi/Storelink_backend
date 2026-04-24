@@ -160,6 +160,48 @@ class AuthApiDatasource {
     }
   }
 
+  Future<Map<String, dynamic>> googleAuth(String supabaseToken) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.baseUrl}/auth/google',
+        data: {'supabase_token': supabaseToken},
+      );
+      if (response.statusCode == 200 && response.data['success']) {
+        return response.data['data'] as Map<String, dynamic>;
+      }
+      throw Exception(response.data['detail'] ?? 'Google auth failed');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      throw Exception(data?['detail']?.toString() ?? 'Connection failed');
+    }
+  }
+
+  Future<Map<String, dynamic>> googleCompleteRegistration({
+    required String supabaseToken,
+    required String phone,
+    required String businessName,
+    String? businessPhone,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.baseUrl}/auth/google/complete',
+        data: {
+          'supabase_token': supabaseToken,
+          'phone': phone,
+          'business_name': businessName,
+          'business_phone': businessPhone ?? phone,
+        },
+      );
+      if (response.statusCode == 201 && response.data['success']) {
+        return response.data['data'] as Map<String, dynamic>;
+      }
+      throw Exception(response.data['detail'] ?? 'Registration failed');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      throw Exception(data?['detail']?.toString() ?? 'Connection failed');
+    }
+  }
+
   Future<void> resetPassword({
     required String phone,
     required String newPassword,

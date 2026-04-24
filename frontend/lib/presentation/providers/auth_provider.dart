@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/business_entity.dart';
@@ -169,6 +171,141 @@ class AuthProvider extends ChangeNotifier {
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Returns:
+  ///   - `{'status': 'logged_in'}` → user existed, navigate to dashboard
+  ///   - `{'status': 'needs_registration', 'email': ..., 'name': ..., 'token': ...}` → new user
+  ///   - `{'status': 'error', 'message': ...}` → failure
+  Future<Map<String, dynamic>> loginWithGoogle() async {
+    try {
+      _status = AuthStatus.loading;
+      _error = null;
+      notifyListeners();
+
+      final googleUser = await GoogleSignIn(
+        serverClientId: const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID'),
+      ).signIn();
+
+      if (googleUser == null) {
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return {'status': 'cancelled'};
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      if (idToken == null) throw Exception('No ID token from Google');
+
+      // Exchange Google ID token for Supabase session
+      final supabase = Supabase.instance.client;
+      final sbResponse = await supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: googleAuth.accessToken,
+      );
+
+      final supabaseToken = sbResponse.session?.accessToken;
+      if (supabaseToken == null) throw Exception('Supabase sign-in failed');
+
+      // Call our backend
+      final data = await _authRepository.googleAuth(supabaseToken);
+
+      if (data['needs_registration'] == true) {
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return {
+          'status': 'needs_registration',
+          'email': data['google_email'] ?? '',
+          'name': data['google_name'] ?? '',
+          'token': data['supabase_token'] ?? supabaseToken,
+        };
+      }
+
+      // Existing user — log them in
+      _user = data['user'] != null ? _parseUser(data) : null;
+      _business = data['business'] != null ? _parseBusiness(data) : null;
+      _accessToken = data['tokens']?['access_token'];
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return {'status': 'logged_in'};
+    } catch (e) {
+      _error = _friendlyError(e);
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return {'status': 'error', 'message': _error};
+    }
+  }
+
+  Future<bool> googleCompleteRegistration({
+    required String supabaseToken,
+    required String phone,
+    required String businessName,
+    String? businessPhone,
+  }) async {
+    try {
+      _status = AuthStatus.loading;
+      _error = null;
+      notifyListeners();
+
+      final result = await _authRepository.googleCompleteRegistration(
+        supabaseToken: supabaseToken,
+        phone: phone,
+        businessName: businessName,
+        businessPhone: businessPhone,
+      );
+
+      final token = result.tokens?.accessToken;
+      if (token == null) {
+        _error = 'Authentication failed: no token received';
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return false;
+      }
+      _user = result.user;
+      _business = result.business;
+      _accessToken = token;
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _friendlyError(e);
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  UserEntity? _parseUser(Map<String, dynamic> data) {
+    try {
+      final u = data['user'] as Map<String, dynamic>;
+      return UserEntity(
+        uuid: u['uuid'] ?? '',
+        phone: u['phone'] ?? '',
+        email: u['email'],
+        fullName: u['full_name'] ?? '',
+        role: u['role'] ?? '',
+        isActive: u['is_active'] ?? true,
+        isVerified: u['is_verified'] ?? false,
+        createdAt: DateTime.tryParse(u['created_at'] ?? '') ?? DateTime.now(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  BusinessEntity? _parseBusiness(Map<String, dynamic> data) {
+    try {
+      final b = data['business'] as Map<String, dynamic>;
+      return BusinessEntity(
+        uuid: b['uuid'] ?? '',
+        businessName: b['business_name'] ?? '',
+        plan: b['plan'] ?? 'FREE',
+        isActive: b['is_active'] ?? true,
+      );
+    } catch (_) {
+      return null;
     }
   }
 

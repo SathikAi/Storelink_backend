@@ -70,6 +70,34 @@ class AuthRepository {
     }
   }
 
+  Future<Map<String, dynamic>> googleAuth(String supabaseToken) async {
+    return await _apiDatasource.googleAuth(supabaseToken);
+  }
+
+  Future<AuthResult> googleCompleteRegistration({
+    required String supabaseToken,
+    required String phone,
+    required String businessName,
+    String? businessPhone,
+  }) async {
+    try {
+      final data = await _apiDatasource.googleCompleteRegistration(
+        supabaseToken: supabaseToken,
+        phone: phone,
+        businessName: businessName,
+        businessPhone: businessPhone,
+      );
+      final user = UserModel.fromJson(data['user']);
+      final business = BusinessModel.fromJson(data['business']);
+      final tokens = AuthTokensModel.fromJson(data['tokens']);
+      await _saveTokens(tokens);
+      return AuthResult(user: user, business: business, tokens: tokens);
+    } catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      throw Exception(msg);
+    }
+  }
+
   Future<void> sendOtp({
     required String phone,
     required String purpose,
