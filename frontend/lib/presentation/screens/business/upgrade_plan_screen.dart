@@ -26,6 +26,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen>
   String? _referralCode;
   int _totalReferrals = 0;
   int _rewardedReferrals = 0;
+  bool _affiliateLoaded = false;
 
   @override
   void initState() {
@@ -50,10 +51,12 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen>
           _referralCode = res.data['referral_code'] as String?;
           _totalReferrals = (res.data['total_referrals'] as int?) ?? 0;
           _rewardedReferrals = (res.data['rewarded_referrals'] as int?) ?? 0;
+          _affiliateLoaded = true;
         });
       }
     } catch (e) {
       debugPrint('Affiliate load error: $e');
+      if (mounted) setState(() => _affiliateLoaded = true);
     }
   }
 
@@ -427,7 +430,14 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen>
                   ),
                   const SizedBox(height: 16),
                   // Referral code box
-                  if (_referralCode != null) ...[
+                  if (!_affiliateLoaded)
+                    const Center(
+                      child: SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white24)),
+                    )
+                  else if (_referralCode != null) ...[
                     const Text('Your Referral Code',
                         style: TextStyle(
                             color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
@@ -473,13 +483,7 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen>
                         ],
                       ),
                     ),
-                  ] else
-                    const Center(
-                      child: SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white24)),
-                    ),
+                  ],
                 ],
               ),
             ),
