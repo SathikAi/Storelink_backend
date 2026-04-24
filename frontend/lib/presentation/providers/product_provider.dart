@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../data/models/product_model.dart';
 import '../../data/repositories/product_repository.dart';
@@ -57,7 +58,7 @@ class ProductProvider with ChangeNotifier {
       }
       _error = null;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -90,7 +91,7 @@ class ProductProvider with ChangeNotifier {
       _currentProduct = await _repository.getProduct(uuid);
       _error = null;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -111,7 +112,7 @@ class ProductProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -135,7 +136,7 @@ class ProductProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -155,7 +156,7 @@ class ProductProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -184,7 +185,7 @@ class ProductProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -213,11 +214,31 @@ class ProductProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
       _isLoading = false;
       notifyListeners();
       return false;
     }
+  }
+
+  String _friendlyError(Object e) {
+    if (e is DioException) {
+      final msg = e.response?.data?['detail'];
+      if (msg != null) return msg.toString();
+      final status = e.response?.statusCode;
+      if (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.unknown) {
+        return 'Cannot connect to server. Check your internet connection.';
+      }
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        return 'Connection timed out. Please try again.';
+      }
+      if (status == 400) return 'Invalid details. Please check and try again.';
+      if (status == 409) return 'A product with this SKU already exists.';
+      if (status != null) return 'Server error ($status). Please try again.';
+    }
+    return 'Something went wrong. Please try again.';
   }
 
   Future<bool> toggleProductStatus(String uuid) async {
@@ -235,7 +256,7 @@ class ProductProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyError(e);
       _isLoading = false;
       notifyListeners();
       return false;

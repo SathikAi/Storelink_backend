@@ -4,6 +4,11 @@ import '../../data/repositories/auth_repository.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/business_entity.dart';
 
+// Returns true if user registered within the last 30 days (free trial window).
+bool _isInTrialPeriod(DateTime registeredAt) {
+  return DateTime.now().difference(registeredAt).inDays < 30;
+}
+
 enum AuthStatus {
   initial,
   authenticated,
@@ -28,14 +33,35 @@ class AuthProvider extends ChangeNotifier {
   String? get accessToken => _accessToken;
   String? get error => _error;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
-  bool get isPro => _business?.plan.toUpperCase() == 'PAID';
+
+  /// True if on PAID plan OR within 30-day free trial from registration.
+  bool get isPro {
+    if (_business?.plan.toUpperCase() == 'PAID') return true;
+    if (_user != null && _isInTrialPeriod(_user!.createdAt)) return true;
+    return false;
+  }
+
+  bool get isOnTrial =>
+      _business?.plan.toUpperCase() != 'PAID' &&
+      _user != null &&
+      _isInTrialPeriod(_user!.createdAt);
+
+  int get trialDaysLeft => _user == null
+      ? 0
+      : (30 - DateTime.now().difference(_user!.createdAt).inDays).clamp(0, 30);
 
   Future<void> checkAuthStatus() async {
     _status = AuthStatus.loading;
     notifyListeners();
 
     final isAuth = await _authRepository.isAuthenticated();
-    if (isAuth) {
+    if (!isAuth) {
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return;
+    }
+
+    try {
       final result = await _authRepository.getCurrentUser();
       if (result != null) {
         _user = result.user;
@@ -43,9 +69,22 @@ class AuthProvider extends ChangeNotifier {
         _accessToken = await _authRepository.getAccessToken();
         _status = AuthStatus.authenticated;
       } else {
+        // getCurrentUser returned null only when token is truly invalid (401).
         _status = AuthStatus.unauthenticated;
       }
-    } else {
+    } on DioException catch (e) {
+      // Network/timeout error — keep user authenticated with cached data.
+      // They'll see an error when they try to load data, but won't be force-logged out.
+      if (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.unknown) {
+        _accessToken = await _authRepository.getAccessToken();
+        _status = AuthStatus.authenticated;
+      } else {
+        _status = AuthStatus.unauthenticated;
+      }
+    } catch (_) {
       _status = AuthStatus.unauthenticated;
     }
     notifyListeners();

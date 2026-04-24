@@ -106,6 +106,16 @@ class BusinessApiDatasource {
     return BusinessModel.fromJson(response.data['data'] as Map<String, dynamic>);
   }
 
+  Future<void> deleteAccount() async {
+    final token = await _tokenService.getAccessToken();
+    await _dio.delete(
+      '${ApiConstants.baseUrl}${ApiConstants.businessProfile}',
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+  }
+
   Future<Map<String, dynamic>> getStats() async {
     final token = await _tokenService.getAccessToken();
 

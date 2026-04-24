@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
+import '../../providers/auth_provider.dart';
 import '../../providers/business_provider.dart';
 import '../../../core/constants/api_constants.dart';
 import 'business_edit_screen.dart';
@@ -279,6 +280,18 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                           ],
                         ),
                         const SizedBox(height: 32),
+
+                        // ── Danger Zone ─────────────────────────────────────
+                        OutlinedButton.icon(
+                          onPressed: () => _confirmDeleteAccount(context),
+                          icon: const Icon(Icons.delete_forever, color: Colors.red),
+                          label: const Text('Delete Account', style: TextStyle(color: Colors.red)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.red),
+                            minimumSize: const Size(double.infinity, 48),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
@@ -289,6 +302,44 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Account'),
+        content: const Text(
+          'This will permanently delete your business account and all associated data. This action cannot be undone.\n\nAre you sure?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final provider = Provider.of<BusinessProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final success = await provider.deleteAccount();
+
+    if (!mounted) return;
+    if (success) {
+      await authProvider.logout();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(provider.error ?? 'Failed to delete account'),
+        backgroundColor: Colors.red,
+      ));
+    }
   }
 
   Widget _buildInfoCard(BuildContext context, String title, List<Widget> children) {

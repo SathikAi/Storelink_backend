@@ -19,6 +19,7 @@ import 'presentation/screens/store/store_cart_screen.dart';
 import 'presentation/screens/store/store_checkout_screen.dart';
 import 'presentation/screens/store/order_confirmation_screen.dart';
 import 'presentation/screens/store/order_status_screen.dart';
+import 'core/services/biometric_service.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/store_provider.dart';
 import 'data/models/store_models.dart';
@@ -131,6 +132,7 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _navigated = false;
+  final _bio = BiometricService();
 
   @override
   void initState() {
@@ -142,6 +144,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<AuthProvider>(context, listen: false).checkAuthStatus();
     });
+  }
+
+  Future<void> _handleAuthenticated(BuildContext ctx) async {
+    final bioEnabled = await _bio.isEnabled();
+    if (!mounted) return;
+    if (!bioEnabled) {
+      ctx.go('/dashboard');
+      return;
+    }
+    final ok = await _bio.authenticate();
+    if (!mounted) return;
+    if (ok) {
+      ctx.go('/dashboard');
+    } else {
+      // Biometric failed — fall back to login
+      // ignore: use_build_context_synchronously
+      await Provider.of<AuthProvider>(ctx, listen: false).logout();
+      if (!mounted) return;
+      // ignore: use_build_context_synchronously
+      ctx.go('/login');
+    }
   }
 
   @override
@@ -170,10 +193,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
         // Redirect after frame so go_router navigation stack is ready
         if (!_navigated) {
           _navigated = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
             if (!mounted) return;
             if (authProvider.status == AuthStatus.authenticated) {
-              context.go('/dashboard');
+              await _handleAuthenticated(context);
             } else {
               context.go('/login');
             }

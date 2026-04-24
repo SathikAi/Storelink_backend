@@ -9,6 +9,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/api_constants.dart';
+import '../../../core/services/biometric_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 
@@ -64,6 +65,56 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
       bottomNavigationBar: _buildBottomNav(),
       drawer: _buildDrawer(auth),
+    );
+  }
+
+  Future<void> _showBiometricSettings(BuildContext context) async {
+    final bio = BiometricService();
+    final available = await bio.isAvailable();
+    if (!context.mounted) return;
+
+    if (!available) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Biometric authentication is not available on this device')),
+      );
+      return;
+    }
+
+    final enabled = await bio.isEnabled();
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Security'),
+          content: SwitchListTile(
+            title: const Text('Fingerprint / Face unlock'),
+            subtitle: const Text('Use biometrics to unlock the app'),
+            value: enabled,
+            onChanged: (val) async {
+              if (val) {
+                final auth = await bio.authenticate();
+                if (!auth) return;
+              }
+              await bio.setEnabled(val);
+              setDialogState(() {});
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(val ? 'Biometric login enabled' : 'Biometric login disabled'),
+                ));
+              }
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -246,6 +297,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                   Navigator.pop(context);
                   context.push('/upgrade');
                 }, color: const Color(0xFF6C63FF)),
+                _drawerItem(Icons.fingerprint_rounded, 'Security', () {
+                  Navigator.pop(context);
+                  _showBiometricSettings(context);
+                }),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Divider(),
@@ -346,7 +401,7 @@ class _DashboardBody extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              user?.fullName ?? 'User',
+                              business?.businessName ?? 'Store',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 22,

@@ -27,6 +27,7 @@ class InventoryProvider with ChangeNotifier {
       _currentPage = 1;
       _products.clear();
       _hasMore = true;
+      _isLoading = false; // reset so refresh always proceeds
     }
 
     if (!_hasMore || _isLoading) return;

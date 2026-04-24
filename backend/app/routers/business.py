@@ -1,6 +1,6 @@
 from typing import List
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Response, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.business import (
@@ -45,6 +45,17 @@ async def update_business_profile(
         message="Business profile updated successfully",
         data=BusinessProfileResponse.model_validate(business)
     )
+
+
+@router.delete("/profile", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_business_account(
+    current_user: User = Depends(get_current_user),
+    business_id: int = Depends(get_current_business_id),
+    db: Session = Depends(get_db)
+):
+    business_service = BusinessService(db)
+    business_service.delete_business(business_id, current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/logo", response_model=BusinessResponse)

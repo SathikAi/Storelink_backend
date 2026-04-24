@@ -27,6 +27,10 @@ class BusinessRepository {
     return await _apiDatasource.uploadImages(imagesBytes, filenames);
   }
 
+  Future<void> deleteAccount() async {
+    return await _apiDatasource.deleteAccount();
+  }
+
   Future<Map<String, dynamic>> getStats() async {
     return await _apiDatasource.getStats();
   }

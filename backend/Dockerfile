@@ -21,7 +21,9 @@ COPY . .
 # Remove any .env files
 RUN rm -f .env .env.* 2>/dev/null || true
 
-RUN mkdir -p uploads logs && chmod 755 uploads logs
+RUN mkdir -p uploads/logos uploads/banners uploads/products uploads/product_images \
+        uploads/business_logos uploads/profile_images logs \
+    && chmod -R 777 uploads && chmod 755 logs
 
 RUN adduser --disabled-password --gecos "" appuser && \
     chown -R appuser:appuser /app

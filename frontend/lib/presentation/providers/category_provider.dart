@@ -26,6 +26,7 @@ class CategoryProvider with ChangeNotifier {
       _currentPage = 1;
       _categories.clear();
       _hasMore = true;
+      _isLoading = false; // reset so refresh always proceeds
     }
 
     if (!_hasMore || _isLoading) return;

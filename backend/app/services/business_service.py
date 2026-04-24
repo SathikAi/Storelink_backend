@@ -1,4 +1,5 @@
 from typing import Optional, Dict
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from fastapi import HTTPException, status, UploadFile
@@ -142,6 +143,13 @@ class BusinessService:
         self.db.refresh(business)
         return business
     
+    def delete_business(self, business_id: int, user) -> None:
+        business = self.get_business_by_id(business_id)
+        now = datetime.now(timezone.utc)
+        business.deleted_at = now
+        user.deleted_at = now
+        self.db.commit()
+
     def get_business_stats(self, business_id: int) -> Dict:
         business = self.get_business_by_id(business_id)
         

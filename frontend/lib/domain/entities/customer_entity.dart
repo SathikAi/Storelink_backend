@@ -43,4 +43,11 @@ class CustomerEntity {
       address != null && city != null && state != null && pincode != null;
 
   String get displayPhone => phone.length == 10 ? '+91 $phone' : phone;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || (other is CustomerEntity && other.uuid == uuid);
+
+  @override
+  int get hashCode => uuid.hashCode;
 }

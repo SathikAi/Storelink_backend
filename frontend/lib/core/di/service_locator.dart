@@ -127,9 +127,16 @@ class ServiceLocator {
                 final retryResponse = await _dio.fetch(opts);
                 return handler.resolve(retryResponse);
               }
-            } catch (_) {
-              // Refresh failed — clear tokens so the app navigates to login
-              await _tokenService.clearTokens();
+            } catch (e) {
+              // Only clear tokens when the refresh endpoint itself rejects them (401/403).
+              // Network errors (no internet, timeout) should NOT log the user out.
+              if (e is DioException) {
+                final status = e.response?.statusCode;
+                if (status == 401 || status == 403) {
+                  await _tokenService.clearTokens();
+                }
+                // else: transient network failure — keep tokens, let request fail normally
+              }
             }
           }
           return handler.next(error);
