@@ -36,16 +36,17 @@ class CategoryProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      const pageSize = 50;
       final newCategories = await _repository.getCategories(
         page: _currentPage,
-        pageSize: 50,
+        pageSize: pageSize,
         isActive: _filterIsActive,
       );
 
-      if (newCategories.isEmpty) {
+      _categories.addAll(newCategories);
+      if (newCategories.length < pageSize) {
         _hasMore = false;
       } else {
-        _categories.addAll(newCategories);
         _currentPage++;
       }
       _error = null;

@@ -39,17 +39,18 @@ class CustomerProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      const pageSize = 50;
       final newCustomers = await _repository.getCustomers(
         page: _currentPage,
-        pageSize: 50,
+        pageSize: pageSize,
         search: _searchQuery,
         isActive: _filterIsActive,
       );
 
-      if (newCustomers.isEmpty) {
+      _customers.addAll(newCustomers);
+      if (newCustomers.length < pageSize) {
         _hasMore = false;
       } else {
-        _customers.addAll(newCustomers);
         _currentPage++;
       }
       _error = null;

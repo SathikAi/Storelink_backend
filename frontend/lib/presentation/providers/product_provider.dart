@@ -42,18 +42,19 @@ class ProductProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      const pageSize = 20;
       final newProducts = await _repository.getProducts(
         page: _currentPage,
-        pageSize: 20,
+        pageSize: pageSize,
         search: _searchQuery,
         categoryId: _filterCategoryId,
         isActive: _filterIsActive,
       );
 
-      if (newProducts.isEmpty) {
+      _products.addAll(newProducts);
+      if (newProducts.length < pageSize) {
         _hasMore = false;
       } else {
-        _products.addAll(newProducts);
         _currentPage++;
       }
       _error = null;
