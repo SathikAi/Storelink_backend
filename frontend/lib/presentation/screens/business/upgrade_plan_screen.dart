@@ -437,7 +437,28 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen>
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white24)),
                     )
-                  else if (_referralCode != null) ...[
+                  else if (_referralCode == null)
+                    GestureDetector(
+                      onTap: _loadAffiliateCode,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.refresh_rounded, color: Colors.white38, size: 16),
+                            const SizedBox(width: 8),
+                            Text('Tap to load referral code',
+                                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    )
+                  else ...[
                     const Text('Your Referral Code',
                         style: TextStyle(
                             color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),

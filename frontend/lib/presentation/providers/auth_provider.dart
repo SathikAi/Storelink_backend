@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:google_sign_in/google_sign_in.dart' if (dart.library.html) 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../domain/entities/user_entity.dart';
@@ -184,30 +184,43 @@ class AuthProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      final googleUser = await GoogleSignIn(
-        serverClientId: const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID'),
-      ).signIn();
+      final supabase = Supabase.instance.client;
+      String? supabaseToken;
 
-      if (googleUser == null) {
+      if (kIsWeb) {
+        // Web: use Supabase OAuth redirect
+        await supabase.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: '${const String.fromEnvironment('WEB_APP_URL', defaultValue: 'https://storelink.sbs')}/#/auth-callback',
+        );
+        // The page redirects — auth state handled in app router on return
         _status = AuthStatus.unauthenticated;
         notifyListeners();
-        return {'status': 'cancelled'};
+        return {'status': 'redirect'};
+      } else {
+        // Mobile: native Google Sign-In
+        final googleUser = await GoogleSignIn(
+          serverClientId: const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID'),
+        ).signIn();
+
+        if (googleUser == null) {
+          _status = AuthStatus.unauthenticated;
+          notifyListeners();
+          return {'status': 'cancelled'};
+        }
+
+        final googleAuth = await googleUser.authentication;
+        final idToken = googleAuth.idToken;
+        if (idToken == null) throw Exception('No ID token from Google');
+
+        final sbResponse = await supabase.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: idToken,
+          accessToken: googleAuth.accessToken,
+        );
+        supabaseToken = sbResponse.session?.accessToken;
+        if (supabaseToken == null) throw Exception('Supabase sign-in failed');
       }
-
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken;
-      if (idToken == null) throw Exception('No ID token from Google');
-
-      // Exchange Google ID token for Supabase session
-      final supabase = Supabase.instance.client;
-      final sbResponse = await supabase.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: googleAuth.accessToken,
-      );
-
-      final supabaseToken = sbResponse.session?.accessToken;
-      if (supabaseToken == null) throw Exception('Supabase sign-in failed');
 
       // Call our backend
       final data = await _authRepository.googleAuth(supabaseToken);
@@ -224,6 +237,34 @@ class AuthProvider extends ChangeNotifier {
       }
 
       // Existing user — log them in
+      _user = data['user'] != null ? _parseUser(data) : null;
+      _business = data['business'] != null ? _parseBusiness(data) : null;
+      _accessToken = data['tokens']?['access_token'];
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return {'status': 'logged_in'};
+    } catch (e) {
+      _error = _friendlyError(e);
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return {'status': 'error', 'message': _error};
+    }
+  }
+
+  Future<Map<String, dynamic>> loginWithGoogleToken(String supabaseToken) async {
+    try {
+      _status = AuthStatus.loading;
+      _error = null;
+      notifyListeners();
+
+      final data = await _authRepository.googleAuth(supabaseToken);
+
+      if (data['needs_registration'] == true) {
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return {'status': 'needs_registration'};
+      }
+
       _user = data['user'] != null ? _parseUser(data) : null;
       _business = data['business'] != null ? _parseBusiness(data) : null;
       _accessToken = data['tokens']?['access_token'];

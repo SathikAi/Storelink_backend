@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/screens/dashboard/dashboard_screen.dart';
@@ -46,6 +47,7 @@ final _router = GoRouter(
     // ── Auth / Business owner routes ──────────────────────────────────────
     GoRoute(path: '/', builder: (_, __) => const AuthWrapper()),
     GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+    GoRoute(path: '/auth-callback', builder: (_, __) => const _GoogleAuthCallbackScreen()),
     GoRoute(path: '/dashboard', builder: (_, __) => const DashboardScreen()),
     GoRoute(path: '/business-profile', builder: (_, __) => const BusinessProfileScreen()),
     GoRoute(path: '/reports', builder: (_, __) => const ReportsScreen()),
@@ -208,6 +210,52 @@ class _AuthWrapperState extends State<AuthWrapper> {
           body: Center(child: CircularProgressIndicator()),
         );
       },
+    );
+  }
+}
+
+/// Handles the redirect back from Supabase Google OAuth on web.
+class _GoogleAuthCallbackScreen extends StatefulWidget {
+  const _GoogleAuthCallbackScreen();
+
+  @override
+  State<_GoogleAuthCallbackScreen> createState() => _GoogleAuthCallbackScreenState();
+}
+
+class _GoogleAuthCallbackScreenState extends State<_GoogleAuthCallbackScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _handleCallback();
+  }
+
+  Future<void> _handleCallback() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      context.go('/login');
+      return;
+    }
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final result = await authProvider.loginWithGoogleToken(session.accessToken);
+    if (!mounted) return;
+
+    switch (result['status']) {
+      case 'logged_in':
+        context.go('/dashboard');
+        break;
+      default:
+        context.go('/login');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }

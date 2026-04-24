@@ -92,6 +92,10 @@ class _DashboardScreenState extends State<DashboardScreen>
             title: const Text('Fingerprint / Face unlock'),
             subtitle: const Text('Use biometrics to unlock the app'),
             value: enabled,
+            activeColor: const Color(0xFF6C63FF),
+            activeTrackColor: const Color(0xFF6C63FF).withOpacity(0.4),
+            inactiveThumbColor: const Color(0xFF888888),
+            inactiveTrackColor: const Color(0xFFCCCCCC),
             onChanged: (val) async {
               if (val) {
                 final auth = await bio.authenticate();
