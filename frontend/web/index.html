@@ -31,6 +31,38 @@
 
   <title>StoreLink | Local Storefront</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    // For customer store pages, override the PWA manifest so the installed
+    // shortcut opens directly to the store, not the business-owner root.
+    (function () {
+      var path = window.location.pathname;
+      if (/^\/store\//.test(path)) {
+        var storeManifest = {
+          name: "StoreLink Customer Store",
+          short_name: "Store",
+          start_url: path,
+          scope: "/store/",
+          display: "standalone",
+          background_color: "#08091A",
+          theme_color: "#FF6F00",
+          description: "Shop directly from your favorite local stores with StoreLink.",
+          orientation: "portrait-primary",
+          prefer_related_applications: false,
+          icons: [
+            { src: "icons/Icon-192.png", sizes: "192x192", type: "image/png" },
+            { src: "icons/Icon-512.png", sizes: "512x512", type: "image/png" },
+            { src: "icons/Icon-maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+            { src: "icons/Icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+          ]
+        };
+        var blob = new Blob([JSON.stringify(storeManifest)], { type: "application/manifest+json" });
+        var manifestLink = document.querySelector('link[rel="manifest"]');
+        if (manifestLink) {
+          manifestLink.setAttribute("href", URL.createObjectURL(blob));
+        }
+      }
+    })();
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

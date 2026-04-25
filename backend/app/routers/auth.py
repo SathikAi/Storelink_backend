@@ -217,7 +217,7 @@ async def google_auth(payload: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid Supabase token")
 
     sb_user = resp.json()
-    google_email = sb_user.get("email", "")
+    google_email = (sb_user.get("email", "") or "").lower().strip()
     google_name = sb_user.get("user_metadata", {}).get("full_name") or \
                   sb_user.get("user_metadata", {}).get("name") or ""
 
@@ -301,7 +301,7 @@ async def google_complete_registration(payload: dict, db: Session = Depends(get_
         raise HTTPException(status_code=401, detail="Invalid Supabase token")
 
     sb_user = resp.json()
-    google_email = sb_user.get("email", "")
+    google_email = (sb_user.get("email", "") or "").lower().strip()
     google_name = sb_user.get("user_metadata", {}).get("full_name") or \
                   sb_user.get("user_metadata", {}).get("name") or business_name
 
@@ -334,9 +334,36 @@ async def google_complete_registration(payload: dict, db: Session = Depends(get_
             }
         )
 
-    # Check phone not taken
-    if db.query(User).filter(User.phone == phone, User.deleted_at.is_(None)).first():
-        raise HTTPException(status_code=400, detail="Phone number already registered")
+    # Check phone not taken — but if the existing account has no email, link Google to it
+    existing_phone_user = db.query(User).filter(User.phone == phone, User.deleted_at.is_(None)).first()
+    if existing_phone_user:
+        if existing_phone_user.email is None:
+            # User registered with phone only; link their Google email and log them in
+            existing_phone_user.email = google_email
+            existing_phone_user.last_login = datetime.now(timezone.utc)
+            biz = db.query(Business).filter(Business.owner_id == existing_phone_user.id).first()
+            if biz and biz.deleted_at is not None:
+                biz.deleted_at = None
+                biz.is_active = True
+            db.commit()
+            db.refresh(existing_phone_user)
+            auth_service = AuthService(db)
+            tokens = auth_service.generate_tokens(existing_phone_user, biz)
+            return AuthResponse(
+                success=True,
+                message="Login successful",
+                data={
+                    "user": UserResponse.model_validate(existing_phone_user).model_dump(),
+                    "business": {
+                        "uuid": biz.uuid,
+                        "business_name": biz.business_name,
+                        "plan": biz.plan.value,
+                    } if biz else None,
+                    "tokens": tokens,
+                }
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Phone number already registered with a different account")
 
     # Create user with random password (Google users don't use password login)
     rand_pw = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
