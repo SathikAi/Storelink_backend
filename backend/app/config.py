@@ -95,6 +95,16 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# Load persisted admin key override (survives container restarts via volume mount)
+_ADMIN_KEY_FILE = "/var/log/storelink/admin_key.txt"
+try:
+    with open(_ADMIN_KEY_FILE) as _f:
+        _saved_key = _f.read().strip()
+        if _saved_key:
+            object.__setattr__(settings, "ADMIN_DASHBOARD_KEY", _saved_key)
+except FileNotFoundError:
+    pass
+
 # Production safety checks
 if settings.is_production:
     if settings.OTP_MOCK:

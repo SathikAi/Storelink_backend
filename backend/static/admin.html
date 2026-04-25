@@ -47,6 +47,8 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .sb-item-badge{margin-left:auto;font-size:10px;font-weight:700;background:var(--s3);color:var(--mut);padding:1px 6px;border-radius:10px}
 .sb-footer{margin-top:auto;padding:12px 8px;border-top:1px solid var(--s3)}
 .sb-footer-key{font-size:10px;color:var(--mut);padding:6px 10px;background:var(--s2);border-radius:var(--r8);font-family:monospace;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-settings{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r8);cursor:pointer;color:var(--mut2);font-size:13px;font-weight:500;background:transparent;border:1px solid transparent;transition:all .15s;margin-bottom:4px}
+.sb-settings:hover{background:var(--s2);color:var(--txt);border-color:var(--s3)}
 .sb-logout{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r8);cursor:pointer;color:var(--red);font-size:13px;font-weight:500;background:transparent;border:1px solid transparent;transition:all .15s}
 .sb-logout:hover{background:rgba(248,81,73,.08);border-color:rgba(248,81,73,.2)}
 .tb-title{font-size:14px;font-weight:700;flex:1}
@@ -485,7 +487,7 @@ const NAV = [
   {id:'profiles', icon:'✦', label:'Profile Completion'},
 ];
 
-const Sidebar = ({page, setPage, adminKey, stats, onLogout}) => (
+const Sidebar = ({page, setPage, adminKey, stats, onLogout, onSettings}) => (
   <div className="sidebar">
     <div className="sb-logo">
       <div className="sb-logo-ico">S</div>
@@ -524,10 +526,85 @@ const Sidebar = ({page, setPage, adminKey, stats, onLogout}) => (
     )}
     <div className="sb-footer">
       <div className="sb-footer-key">🔑 {adminKey.slice(0,20)}…</div>
+      <button className="sb-settings" onClick={onSettings}>⚙ Change Admin Key</button>
       <button className="sb-logout" onClick={onLogout}><span>→</span> Sign Out</button>
     </div>
   </div>
 );
+
+/* ──────────────── CHANGE KEY MODAL ──── */
+const ChangeKeyModal = ({adminKey, onClose, onChanged}) => {
+  const [newKey, setNewKey] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const toast = React.useContext(ToastCtx);
+
+  const valid = newKey.length >= 16 && newKey === confirm;
+
+  const save = async () => {
+    if (!valid) return;
+    setLoading(true);
+    try {
+      await apiCall('/dashboard-settings/admin-key', 'PATCH', {new_key: newKey}, adminKey);
+      toast('Admin key updated — save it now!', 'ok');
+      onChanged(newKey);
+      onClose();
+    } catch(e) {
+      toast(e.message, 'err');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="modal-bg" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="modal">
+        <div className="modal-title">⚙ Change Admin Key</div>
+        <div className="modal-sub">Set a new admin dashboard key. Must be at least 16 characters. Copy and store it safely before saving.</div>
+
+        <div className="form-group">
+          <label className="form-label">New Key</label>
+          <div style={{display:'flex',gap:6}}>
+            <input
+              type={show?'text':'password'}
+              className="form-input"
+              placeholder="Min 16 characters"
+              value={newKey}
+              onChange={e=>setNewKey(e.target.value)}
+              style={{flex:1}}
+            />
+            <button className="btn btn-cancel" style={{padding:'9px 12px'}} onClick={()=>setShow(s=>!s)}>{show?'🙈':'👁'}</button>
+          </div>
+          {newKey && newKey.length < 16 && <div className="form-hint text-red">Too short — need at least 16 characters</div>}
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Confirm New Key</label>
+          <input
+            type={show?'text':'password'}
+            className="form-input"
+            placeholder="Re-enter new key"
+            value={confirm}
+            onChange={e=>setConfirm(e.target.value)}
+          />
+          {confirm && confirm !== newKey && <div className="form-hint text-red">Keys do not match</div>}
+          {confirm && confirm === newKey && newKey.length >= 16 && <div className="form-hint text-grn">✓ Keys match</div>}
+        </div>
+
+        <div style={{background:'rgba(210,153,34,.06)',border:'1px solid rgba(210,153,34,.2)',borderRadius:8,padding:'10px 12px',fontSize:11,color:'var(--ora2)',marginBottom:4}}>
+          ⚠ The new key takes effect immediately. You will need to log in again with the new key.
+        </div>
+
+        <div className="modal-row">
+          <button className="btn btn-cancel" onClick={onClose} disabled={loading}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={!valid||loading}>
+            {loading ? 'Saving…' : 'Save New Key'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* ──────────────── OVERVIEW PAGE ─────── */
 const OverviewPage = ({data}) => {
@@ -1227,11 +1304,17 @@ const App = () => {
     },1000);
   },[loadData]);
 
+  const [showKeyModal, setShowKeyModal] = useState(false);
+
   const onLogin = (k,d) => { setAdminKey(k); setData(d); startCountdown(); };
   const logout = () => {
     sessionStorage.removeItem('sl_ak');
     setAdminKey(''); setData(null);
     clearInterval(cdRef.current);
+  };
+  const onKeyChanged = (newKey) => {
+    sessionStorage.setItem('sl_ak', newKey);
+    setAdminKey(newKey);
   };
 
   useEffect(()=>{
@@ -1262,7 +1345,8 @@ const App = () => {
 
   return (
     <div className="layout">
-      <Sidebar page={page} setPage={setPage} adminKey={adminKey} stats={data.stats} onLogout={logout}/>
+      <Sidebar page={page} setPage={setPage} adminKey={adminKey} stats={data.stats} onLogout={logout} onSettings={()=>setShowKeyModal(true)}/>
+      {showKeyModal && <ChangeKeyModal adminKey={adminKey} onClose={()=>setShowKeyModal(false)} onChanged={onKeyChanged}/>}
       <div className="main">
         <div className="topbar">
           <span className="tb-title">{PAGE_TITLES[page]}</span>

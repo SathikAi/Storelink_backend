@@ -16,7 +16,8 @@ from app.schemas.admin import (
     AdminStatusUpdateResponse,
     UpdateBusinessStatusRequest,
     UpdateBusinessPlanRequest,
-    UpdateUserStatusRequest
+    UpdateUserStatusRequest,
+    UpdateAdminKeyRequest
 )
 from app.services.admin_service import AdminService
 
@@ -271,3 +272,29 @@ async def dashboard_update_user_status(
     admin_service.update_user_status(uuid, body)
     status_text = "activated" if body.is_active else "deactivated"
     return {"success": True, "message": f"User {status_text}"}
+
+
+_ADMIN_KEY_FILE = "/var/log/storelink/admin_key.txt"
+
+
+@router.patch("/dashboard-settings/admin-key")
+async def update_admin_key(
+    body: UpdateAdminKeyRequest,
+    x_admin_key: Optional[str] = Header(None, alias="X-Admin-Key"),
+):
+    """Change the admin dashboard key. Persists across container restarts."""
+    if not x_admin_key or x_admin_key != settings.ADMIN_DASHBOARD_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin key")
+
+    new_key = body.new_key.strip()
+
+    try:
+        import os
+        os.makedirs(os.path.dirname(_ADMIN_KEY_FILE), exist_ok=True)
+        with open(_ADMIN_KEY_FILE, "w") as f:
+            f.write(new_key)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to persist key: {e}")
+
+    object.__setattr__(settings, "ADMIN_DASHBOARD_KEY", new_key)
+    return {"success": True, "message": "Admin key updated successfully"}

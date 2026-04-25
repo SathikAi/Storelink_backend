@@ -172,3 +172,7 @@ class AdminStatusUpdateResponse(BaseModel):
     success: bool = True
     message: str
     timestamp: datetime = Field(default_factory=_utc_now)
+
+
+class UpdateAdminKeyRequest(BaseModel):
+    new_key: str = Field(..., min_length=16, description="New admin dashboard key (min 16 chars)")
