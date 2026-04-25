@@ -334,12 +334,15 @@ async def google_complete_registration(payload: dict, db: Session = Depends(get_
             }
         )
 
-    # Check phone not taken — but if the existing account has no email, link Google to it
+    # Check phone not taken — link or log in if the account belongs to this Google user
     existing_phone_user = db.query(User).filter(User.phone == phone, User.deleted_at.is_(None)).first()
     if existing_phone_user:
-        if existing_phone_user.email is None:
-            # User registered with phone only; link their Google email and log them in
-            existing_phone_user.email = google_email
+        existing_email = (existing_phone_user.email or "").lower().strip()
+        email_matches = existing_email == google_email or existing_email == ""
+        if email_matches:
+            # No email set (link it) OR email already matches this Google account → log in
+            if existing_phone_user.email is None:
+                existing_phone_user.email = google_email
             existing_phone_user.last_login = datetime.now(timezone.utc)
             biz = db.query(Business).filter(Business.owner_id == existing_phone_user.id).first()
             if biz and biz.deleted_at is not None:
