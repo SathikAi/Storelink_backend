@@ -191,7 +191,7 @@ class AuthProvider extends ChangeNotifier {
         // Web: use Supabase OAuth redirect
         await supabase.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: '${const String.fromEnvironment('WEB_APP_URL', defaultValue: 'https://storelink.sbs')}/#/auth-callback',
+          redirectTo: '${const String.fromEnvironment('WEB_APP_URL', defaultValue: 'https://storelink.sbs')}/auth-callback',
         );
         // The page redirects — auth state handled in app router on return
         _status = AuthStatus.unauthenticated;
@@ -262,7 +262,12 @@ class AuthProvider extends ChangeNotifier {
       if (data['needs_registration'] == true) {
         _status = AuthStatus.unauthenticated;
         notifyListeners();
-        return {'status': 'needs_registration'};
+        return {
+          'status': 'needs_registration',
+          'email': data['google_email'] ?? '',
+          'name': data['google_name'] ?? '',
+          'token': supabaseToken,
+        };
       }
 
       _user = data['user'] != null ? _parseUser(data) : null;

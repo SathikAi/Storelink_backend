@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'app.dart';
 import 'core/di/service_locator.dart';
 
 void main() {
+  if (kIsWeb) usePathUrlStrategy();
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 

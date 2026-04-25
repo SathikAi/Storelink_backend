@@ -92,6 +92,7 @@ class _LoginScreenState extends State<LoginScreen>
         ));
         break;
       case 'cancelled':
+      case 'redirect':
         break;
       default:
         _showError(result['message'] ?? 'Google sign-in failed');
@@ -535,7 +536,7 @@ class _LegalFooter extends StatelessWidget {
                 '1. Information We Collect\nWe collect your phone number, business name, and transaction data to provide our services.\n\n'
                 '2. How We Use It\nYour data is used to operate the app, process orders, and improve our services. We never sell your personal data.\n\n'
                 '3. Data Security\nAll data is encrypted in transit (TLS) and at rest. We use industry-standard security practices.\n\n'
-                '4. Your Rights\nYou can request deletion of your account and data at any time by contacting support@storelink.in.\n\n'
+                '4. Your Rights\nYou can request deletion of your account and data at any time by contacting contactus@zeramai.com.\n\n'
                 '5. Cookies\nWe use minimal cookies for session management only.\n\n'
                 'Last updated: April 2026',
               ),
@@ -562,15 +563,15 @@ class _LegalFooter extends StatelessWidget {
               onTap: () => _showSheet(
                 context,
                 'Contact & Support',
-                '📧  Email: support@storelink.in\n\n'
-                '📞  Phone: +91 98765 43210\n     (Mon–Sat, 9 AM – 6 PM IST)\n\n'
-                '🌐  Website: www.storelink.in\n\n'
-                '📍  Address:\n     StoreLink Pvt. Ltd.\n'
-                '     14/2, Velachery Main Road,\n'
-                '     Chennai – 600 042,\n'
-                '     Tamil Nadu, India.\n\n'
+                '📧  Email: contactus@zeramai.com\n\n'
+                '📞  Phone: 9080537845, 9384364069\n\n'
+                '🌐  Website: www.zeramai.com\n\n'
+                '📍  Office:\n     1st Floor, Covai Tech Park,\n'
+                '     Near Viswasapuram Bus Stop,\n'
+                '     Sathy Road, Saravanampatti,\n'
+                '     Coimbatore – 641035, TN\n\n'
                 '💬  Live Chat: Available inside the app after login.\n\n'
-                'For billing or account issues, email billing@storelink.in.\n'
+                'For billing or account issues, email contactus@zeramai.com.\n'
                 'We typically respond within 24 business hours.',
               ),
             ),

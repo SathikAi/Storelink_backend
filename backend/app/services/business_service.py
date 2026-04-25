@@ -145,9 +145,8 @@ class BusinessService:
     
     def delete_business(self, business_id: int, user) -> None:
         business = self.get_business_by_id(business_id)
-        now = datetime.now(timezone.utc)
-        business.deleted_at = now
-        user.deleted_at = now
+        self.db.delete(business)
+        self.db.delete(user)
         self.db.commit()
 
     def get_business_stats(self, business_id: int) -> Dict:

@@ -224,19 +224,19 @@ async def google_auth(payload: dict, db: Session = Depends(get_db)):
     if not google_email:
         raise HTTPException(status_code=400, detail="Google account has no email")
 
-    # Find existing user by email
+    # Find existing user by email (including soft-deleted — restore them)
     from app.models.business import Business
-    user = db.query(User).filter(
-        User.email == google_email,
-        User.deleted_at.is_(None)
-    ).first()
+    user = db.query(User).filter(User.email == google_email).first()
 
     if user:
-        # Existing user — return our JWT
-        business = db.query(Business).filter(
-            Business.owner_id == user.id,
-            Business.deleted_at.is_(None)
-        ).first()
+        # Restore soft-deleted account if needed
+        if user.deleted_at is not None:
+            user.deleted_at = None
+            user.is_active = True
+        business = db.query(Business).filter(Business.owner_id == user.id).first()
+        if business and business.deleted_at is not None:
+            business.deleted_at = None
+            business.is_active = True
         auth_service = AuthService(db)
         tokens = auth_service.generate_tokens(user, business)
         user.last_login = datetime.now(timezone.utc)
@@ -304,6 +304,35 @@ async def google_complete_registration(payload: dict, db: Session = Depends(get_
     google_email = sb_user.get("email", "")
     google_name = sb_user.get("user_metadata", {}).get("full_name") or \
                   sb_user.get("user_metadata", {}).get("name") or business_name
+
+    # If email already exists (e.g. soft-deleted account), restore and log in
+    existing = db.query(User).filter(User.email == google_email).first()
+    if existing:
+        if existing.deleted_at is not None:
+            existing.deleted_at = None
+            existing.is_active = True
+        biz = db.query(Business).filter(Business.owner_id == existing.id).first()
+        if biz and biz.deleted_at is not None:
+            biz.deleted_at = None
+            biz.is_active = True
+        existing.last_login = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(existing)
+        auth_service = AuthService(db)
+        tokens = auth_service.generate_tokens(existing, biz)
+        return AuthResponse(
+            success=True,
+            message="Login successful",
+            data={
+                "user": UserResponse.model_validate(existing).model_dump(),
+                "business": {
+                    "uuid": biz.uuid,
+                    "business_name": biz.business_name,
+                    "plan": biz.plan.value,
+                } if biz else None,
+                "tokens": tokens,
+            }
+        )
 
     # Check phone not taken
     if db.query(User).filter(User.phone == phone, User.deleted_at.is_(None)).first():

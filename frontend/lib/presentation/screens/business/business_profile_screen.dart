@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -334,6 +335,8 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
     if (!mounted) return;
     if (success) {
       await authProvider.logout();
+      if (!mounted) return;
+      context.go('/login');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(provider.error ?? 'Failed to delete account'),

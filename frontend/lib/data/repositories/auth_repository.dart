@@ -71,7 +71,12 @@ class AuthRepository {
   }
 
   Future<Map<String, dynamic>> googleAuth(String supabaseToken) async {
-    return await _apiDatasource.googleAuth(supabaseToken);
+    final data = await _apiDatasource.googleAuth(supabaseToken);
+    if (data['needs_registration'] != true && data['tokens'] != null) {
+      final tokens = AuthTokensModel.fromJson(data['tokens']);
+      await _saveTokens(tokens);
+    }
+    return data;
   }
 
   Future<AuthResult> googleCompleteRegistration({
