@@ -214,10 +214,15 @@ class AdminService:
         old_plan = business.plan
         business.plan = BusinessPlan(data.plan.value)
         business.plan_expiry_date = data.plan_expiry_date
-        
+
+        if data.subscription_type is not None:
+            business.subscription_type = data.subscription_type if data.plan.value == "PAID" else None
+        elif data.plan.value == "FREE":
+            business.subscription_type = None
+
         if old_plan != business.plan:
             PlanLimitService.initialize_plan_limits(self.db, business.id, business.plan)
-        
+
         self.db.commit()
     
     def get_all_users(

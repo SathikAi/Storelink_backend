@@ -91,6 +91,7 @@ class UpdateBusinessStatusRequest(BaseModel):
 class UpdateBusinessPlanRequest(BaseModel):
     plan: PlanType
     plan_expiry_date: Optional[date] = None
+    subscription_type: Optional[str] = None  # "monthly" | "yearly" | "trial"
 
 
 class UpdateUserStatusRequest(BaseModel):

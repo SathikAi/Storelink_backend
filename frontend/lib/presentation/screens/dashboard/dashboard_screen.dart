@@ -301,6 +301,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                   Navigator.pop(context);
                   context.push('/upgrade');
                 }, color: const Color(0xFF6C63FF)),
+                if (auth.user?.role == 'SUPER_ADMIN') ...[
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Divider(),
+                  ),
+                  _drawerItem(Icons.admin_panel_settings_rounded, 'Admin Portal', () {
+                    Navigator.pop(context);
+                    context.push('/admin');
+                  }, color: Colors.red.shade700),
+                ],
                 _drawerItem(Icons.fingerprint_rounded, 'Security', () {
                   Navigator.pop(context);
                   _showBiometricSettings(context);

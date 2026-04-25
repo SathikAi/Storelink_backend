@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/screens/auth/login_screen.dart';
+import 'presentation/screens/auth/google_register_screen.dart';
 import 'presentation/screens/dashboard/dashboard_screen.dart';
 import 'presentation/screens/business/business_profile_screen.dart';
 import 'presentation/screens/reports/reports_screen.dart';
@@ -20,6 +21,7 @@ import 'presentation/screens/store/store_cart_screen.dart';
 import 'presentation/screens/store/store_checkout_screen.dart';
 import 'presentation/screens/store/order_confirmation_screen.dart';
 import 'presentation/screens/store/order_status_screen.dart';
+import 'presentation/screens/admin/admin_portal_screen.dart';
 import 'core/services/biometric_service.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/store_provider.dart';
@@ -57,6 +59,7 @@ final _router = GoRouter(
     GoRoute(path: '/categories', builder: (_, __) => const CategoriesListScreen()),
     GoRoute(path: '/inventory', builder: (_, __) => const InventoryListScreen()),
     GoRoute(path: '/upgrade', builder: (_, __) => const UpgradePlanScreen()),
+    GoRoute(path: '/admin', builder: (_, __) => const AdminPortalScreen()),
 
     // ── Customer store routes (public, no auth needed) ────────────────────
     ShellRoute(
@@ -230,10 +233,28 @@ class _GoogleAuthCallbackScreenState extends State<_GoogleAuthCallbackScreen> {
   }
 
   Future<void> _handleCallback() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    final supabase = Supabase.instance.client;
+
+    // supabase_flutter SDK auto-exchanges the ?code= on initialize().
+    // Wait for that event rather than manually calling exchangeCodeForSession.
+    Session? session = supabase.auth.currentSession;
+
+    if (session == null) {
+      try {
+        final event = await supabase.auth.onAuthStateChange
+            .where((e) =>
+                e.event == AuthChangeEvent.signedIn ||
+                e.event == AuthChangeEvent.tokenRefreshed)
+            .first
+            .timeout(const Duration(seconds: 15));
+        session = event.session;
+      } catch (_) {
+        session = supabase.auth.currentSession;
+      }
+    }
+
     if (!mounted) return;
 
-    final session = Supabase.instance.client.auth.currentSession;
     if (session == null) {
       context.go('/login');
       return;
@@ -246,6 +267,16 @@ class _GoogleAuthCallbackScreenState extends State<_GoogleAuthCallbackScreen> {
     switch (result['status']) {
       case 'logged_in':
         context.go('/dashboard');
+        break;
+      case 'needs_registration':
+        // New Google user — push registration screen
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => GoogleRegisterScreen(
+            supabaseToken: result['token'] ?? session!.accessToken,
+            googleEmail: result['email'] ?? '',
+            googleName: result['name'] ?? '',
+          ),
+        ));
         break;
       default:
         context.go('/login');
