@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../core/constants/api_constants.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/datasources/affiliate_api_datasource.dart';
 import '../../../data/datasources/billing_api_datasource.dart';
 import '../../providers/business_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -39,18 +38,16 @@ class _UpgradePlanScreenState extends State<UpgradePlanScreen>
   }
 
   Future<void> _loadAffiliateCode() async {
+    if (mounted) setState(() => _affiliateLoaded = false);
     try {
       final sl = ServiceLocator();
-      final token = await sl.tokenService.getAccessToken();
-      final res = await sl.dio.get(
-        '${ApiConstants.baseUrl}/affiliate/my-code',
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
-      );
+      final ds = AffiliateApiDatasource(sl.dio, sl.tokenService);
+      final stats = await ds.getMyCode();
       if (mounted) {
         setState(() {
-          _referralCode = res.data['referral_code'] as String?;
-          _totalReferrals = (res.data['total_referrals'] as int?) ?? 0;
-          _rewardedReferrals = (res.data['rewarded_referrals'] as int?) ?? 0;
+          _referralCode = stats.referralCode;
+          _totalReferrals = stats.totalReferrals;
+          _rewardedReferrals = stats.rewardedReferrals;
           _affiliateLoaded = true;
         });
       }

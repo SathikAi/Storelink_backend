@@ -135,13 +135,15 @@ class AuthWrapper extends StatefulWidget {
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
-class _AuthWrapperState extends State<AuthWrapper> {
+class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   bool _navigated = false;
+  bool _appWasInBackground = false;
   final _bio = BiometricService();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
@@ -149,6 +151,36 @@ class _AuthWrapperState extends State<AuthWrapper> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<AuthProvider>(context, listen: false).checkAuthStatus();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _appWasInBackground = true;
+    } else if (state == AppLifecycleState.resumed && _appWasInBackground) {
+      _appWasInBackground = false;
+      _triggerBiometricOnResume();
+    }
+  }
+
+  Future<void> _triggerBiometricOnResume() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isAuthenticated) return;
+    final bioEnabled = await _bio.isEnabled();
+    if (!bioEnabled || !mounted) return;
+    final ok = await _bio.authenticate();
+    if (!mounted) return;
+    if (!ok) {
+      await authProvider.logout();
+      if (mounted) context.go('/login');
+    }
   }
 
   Future<void> _handleAuthenticated(BuildContext ctx) async {

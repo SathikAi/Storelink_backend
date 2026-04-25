@@ -221,7 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   child: (business?.logoUrl == null ||
                           business!.logoUrl!.isEmpty)
                       ? Text(
-                          (user?.fullName ?? 'U')[0].toUpperCase(),
+                          (business?.businessName ?? user?.fullName ?? 'U')[0].toUpperCase(),
                           style: const TextStyle(
                               color: Colors.white,
                               fontSize: 22,
@@ -454,7 +454,7 @@ class _DashboardBody extends StatelessWidget {
                               child: (business?.logoUrl == null ||
                                       business!.logoUrl!.isEmpty)
                                   ? Text(
-                                      (user?.fullName ?? 'U')[0].toUpperCase(),
+                                      (business?.businessName ?? user?.fullName ?? 'U')[0].toUpperCase(),
                                       style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w700,
