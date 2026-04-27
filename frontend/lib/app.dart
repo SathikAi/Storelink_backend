@@ -140,6 +140,7 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   bool _navigated = false;
   bool _appWasInBackground = false;
+  bool _isAuthenticating = false;
   final _bio = BiometricService();
 
   @override
@@ -173,12 +174,16 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   }
 
   Future<void> _triggerBiometricOnResume() async {
+    if (_isAuthenticating) return;
+    
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (!authProvider.isAuthenticated) return;
     final bioEnabled = await _bio.isEnabled();
     if (!mounted) return;
     if (bioEnabled) {
+      _isAuthenticating = true;
       final ok = await _bio.authenticate();
+      _isAuthenticating = false;
       if (!mounted) return;
       if (!ok) {
         await authProvider.logout();
@@ -201,22 +206,27 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   }
 
   Future<void> _handleAuthenticated(BuildContext ctx) async {
+    if (_isAuthenticating) return;
+
     final bioEnabled = await _bio.isEnabled();
     if (!mounted) return;
     if (!bioEnabled) {
       ctx.go('/dashboard');
       return;
     }
+
+    _isAuthenticating = true;
     final ok = await _bio.authenticate();
+    _isAuthenticating = false;
+
     if (!mounted) return;
     if (ok) {
       ctx.go('/dashboard');
     } else {
       // Biometric failed — fall back to login
-      // ignore: use_build_context_synchronously
-      await Provider.of<AuthProvider>(ctx, listen: false).logout();
+      final authProvider = Provider.of<AuthProvider>(ctx, listen: false);
+      await authProvider.logout();
       if (!mounted) return;
-      // ignore: use_build_context_synchronously
       ctx.go('/login');
     }
   }
