@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/business_entity.dart';
@@ -198,34 +199,41 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return {'status': 'redirect'};
       } else {
-        // Mobile: Supabase web OAuth → opens system browser → deep link returns to app
-        // Requires com.storelink.app://auth-callback in Supabase allowed redirect URLs
-        final completer = Completer<Session?>();
-        StreamSubscription<AuthState>? sub;
-        sub = supabase.auth.onAuthStateChange.listen((data) {
-          if (data.event == AuthChangeEvent.signedIn && data.session != null) {
-            if (!completer.isCompleted) completer.complete(data.session);
-            sub?.cancel();
-          }
-        });
+        // Mobile: Use native Google Sign-In
+        // Requires google-services.json in android/app/ and SHA-1 in Google Console
+        const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+        const iosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
 
-        await supabase.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: 'com.storelink.app://auth-callback',
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          clientId: iosClientId.isEmpty ? null : iosClientId,
+          serverClientId: webClientId.isEmpty ? null : webClientId,
         );
-
-        // Wait for user to complete OAuth in browser and deep link to fire
-        Session? session;
-        try {
-          session = await completer.future.timeout(const Duration(minutes: 3));
-        } catch (_) {
-          sub?.cancel();
+        
+        final googleUser = await googleSignIn.signIn();
+        if (googleUser == null) {
           _status = AuthStatus.unauthenticated;
           notifyListeners();
           return {'status': 'cancelled'};
         }
 
-        supabaseToken = session?.accessToken;
+        final googleAuth = await googleUser.authentication;
+        final idToken = googleAuth.idToken;
+        final accessToken = googleAuth.accessToken;
+
+        if (idToken == null) {
+          _status = AuthStatus.unauthenticated;
+          _error = 'Could not get ID token from Google';
+          notifyListeners();
+          return {'status': 'error', 'message': _error};
+        }
+
+        final response = await supabase.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: idToken,
+          accessToken: accessToken,
+        );
+
+        supabaseToken = response.session?.accessToken;
         if (supabaseToken == null) {
           _status = AuthStatus.unauthenticated;
           notifyListeners();
