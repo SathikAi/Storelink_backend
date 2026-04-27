@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
-import 'package:google_sign_in/google_sign_in.dart' if (dart.library.html) 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../domain/entities/user_entity.dart';
@@ -198,32 +198,39 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return {'status': 'redirect'};
       } else {
-        // Mobile: native Google Sign-In
-        const googleClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
-        if (googleClientId.isEmpty) {
-          throw Exception('Google Sign-In is not configured for this build.');
-        }
-        final googleUser = await GoogleSignIn(
-          serverClientId: googleClientId,
-        ).signIn();
+        // Mobile: Supabase web OAuth → opens system browser → deep link returns to app
+        // Requires com.storelink.app://auth-callback in Supabase allowed redirect URLs
+        final completer = Completer<Session?>();
+        StreamSubscription<AuthState>? sub;
+        sub = supabase.auth.onAuthStateChange.listen((data) {
+          if (data.event == AuthChangeEvent.signedIn && data.session != null) {
+            if (!completer.isCompleted) completer.complete(data.session);
+            sub?.cancel();
+          }
+        });
 
-        if (googleUser == null) {
+        await supabase.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: 'com.storelink.app://auth-callback',
+        );
+
+        // Wait for user to complete OAuth in browser and deep link to fire
+        Session? session;
+        try {
+          session = await completer.future.timeout(const Duration(minutes: 3));
+        } catch (_) {
+          sub?.cancel();
           _status = AuthStatus.unauthenticated;
           notifyListeners();
           return {'status': 'cancelled'};
         }
 
-        final googleAuth = await googleUser.authentication;
-        final idToken = googleAuth.idToken;
-        if (idToken == null) throw Exception('No ID token from Google');
-
-        final sbResponse = await supabase.auth.signInWithIdToken(
-          provider: OAuthProvider.google,
-          idToken: idToken,
-          accessToken: googleAuth.accessToken,
-        );
-        supabaseToken = sbResponse.session?.accessToken;
-        if (supabaseToken == null) throw Exception('Supabase sign-in failed');
+        supabaseToken = session?.accessToken;
+        if (supabaseToken == null) {
+          _status = AuthStatus.unauthenticated;
+          notifyListeners();
+          return {'status': 'cancelled'};
+        }
       }
 
       // Call our backend

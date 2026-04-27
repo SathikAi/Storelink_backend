@@ -249,6 +249,14 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
           _navigated = true;
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             if (!mounted) return;
+
+            // Check if we are already on a public route (like /store/...)
+            // GoRouter matches the deep link even if we start at AuthWrapper
+            final location = GoRouterState.of(context).uri.toString();
+            if (location.startsWith('/store/')) {
+              return; // Allow public access to store
+            }
+
             if (authProvider.status == AuthStatus.authenticated) {
               await _handleAuthenticated(context);
             } else {
