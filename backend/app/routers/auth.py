@@ -36,7 +36,12 @@ async def register(data: RegisterRequest, db: Session = Depends(get_db)):
             "business": {
                 "uuid": business.uuid,
                 "business_name": business.business_name,
-                "plan": business.plan.value
+                "plan": business.plan.value,
+                "is_active": business.is_active,
+                "logo_url": business.logo_url,
+                "banner_url": business.banner_url,
+                "phone": business.phone,
+                "email": business.email,
             },
             "tokens": tokens
         }
@@ -60,7 +65,12 @@ async def login(data: LoginRequest, db: Session = Depends(get_db)):
             "business": {
                 "uuid": business.uuid,
                 "business_name": business.business_name,
-                "plan": business.plan.value
+                "plan": business.plan.value,
+                "is_active": business.is_active,
+                "logo_url": business.logo_url,
+                "banner_url": business.banner_url,
+                "phone": business.phone,
+                "email": business.email,
             } if business else None,
             "tokens": tokens
         }
@@ -105,7 +115,12 @@ async def verify_otp(data: OTPVerifyRequest, db: Session = Depends(get_db)):
                 "business": {
                     "uuid": business.uuid,
                     "business_name": business.business_name,
-                    "plan": business.plan.value
+                    "plan": business.plan.value,
+                    "is_active": business.is_active,
+                    "logo_url": business.logo_url,
+                    "banner_url": business.banner_url,
+                    "phone": business.phone,
+                    "email": business.email,
                 } if business else None,
                 "tokens": tokens
             }
@@ -250,6 +265,11 @@ async def google_auth(payload: dict, db: Session = Depends(get_db)):
                     "uuid": business.uuid,
                     "business_name": business.business_name,
                     "plan": business.plan.value,
+                    "is_active": business.is_active,
+                    "logo_url": business.logo_url,
+                    "banner_url": business.banner_url,
+                    "phone": business.phone,
+                    "email": business.email,
                 } if business else None,
                 "tokens": tokens,
             }
@@ -419,6 +439,11 @@ async def google_complete_registration(payload: dict, db: Session = Depends(get_
                 "uuid": business.uuid,
                 "business_name": business.business_name,
                 "plan": business.plan.value,
+                "is_active": business.is_active,
+                "logo_url": business.logo_url,
+                "banner_url": business.banner_url,
+                "phone": business.phone,
+                "email": business.email,
             },
             "tokens": tokens,
         }
