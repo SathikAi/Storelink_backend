@@ -24,6 +24,8 @@ import 'presentation/screens/store/order_status_screen.dart';
 import 'presentation/screens/admin/admin_portal_screen.dart';
 import 'core/services/biometric_service.dart';
 import 'presentation/providers/auth_provider.dart';
+import 'presentation/providers/dashboard_provider.dart';
+import 'presentation/providers/order_provider.dart';
 import 'presentation/providers/store_provider.dart';
 import 'data/models/store_models.dart';
 
@@ -174,13 +176,28 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (!authProvider.isAuthenticated) return;
     final bioEnabled = await _bio.isEnabled();
-    if (!bioEnabled || !mounted) return;
-    final ok = await _bio.authenticate();
     if (!mounted) return;
-    if (!ok) {
-      await authProvider.logout();
-      if (mounted) context.go('/login');
+    if (bioEnabled) {
+      final ok = await _bio.authenticate();
+      if (!mounted) return;
+      if (!ok) {
+        await authProvider.logout();
+        if (mounted) context.go('/login');
+        return;
+      }
     }
+    // Refresh key data after returning to foreground so the UI is up to date
+    _refreshDataOnResume();
+  }
+
+  void _refreshDataOnResume() {
+    if (!mounted) return;
+    try {
+      Provider.of<DashboardProvider>(context, listen: false).refreshStats();
+    } catch (_) {}
+    try {
+      Provider.of<OrderProvider>(context, listen: false).loadOrders(refresh: true);
+    } catch (_) {}
   }
 
   Future<void> _handleAuthenticated(BuildContext ctx) async {

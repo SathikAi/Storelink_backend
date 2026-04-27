@@ -199,8 +199,12 @@ class AuthProvider extends ChangeNotifier {
         return {'status': 'redirect'};
       } else {
         // Mobile: native Google Sign-In
+        const googleClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+        if (googleClientId.isEmpty) {
+          throw Exception('Google Sign-In is not configured for this build.');
+        }
         final googleUser = await GoogleSignIn(
-          serverClientId: const String.fromEnvironment('GOOGLE_WEB_CLIENT_ID'),
+          serverClientId: googleClientId,
         ).signIn();
 
         if (googleUser == null) {

@@ -107,11 +107,13 @@ class ReportService:
     ) -> ProductReportResponse:
         business = self.db.query(Business).filter(Business.id == business_id).first()
         business_name = business.business_name if business else "Unknown"
-        
-        query = self.db.query(
+
+        start_date = self._parse_date(from_date)
+        end_date = self._parse_date(to_date)
+
+        # Build order-item sales stats for the date range
+        sales_q = self.db.query(
             OrderItem.product_id,
-            OrderItem.product_name,
-            OrderItem.product_sku,
             func.sum(OrderItem.quantity).label('total_quantity'),
             func.sum(OrderItem.total_price).label('total_revenue'),
             func.count(func.distinct(OrderItem.order_id)).label('orders_count')
@@ -119,52 +121,55 @@ class ReportService:
             Order.business_id == business_id,
             Order.deleted_at.is_(None)
         )
-        
-        start_date = self._parse_date(from_date)
-        end_date = self._parse_date(to_date)
-        
         if start_date:
-            query = query.filter(func.date(Order.order_date) >= start_date)
+            sales_q = sales_q.filter(func.date(Order.order_date) >= start_date)
         if end_date:
-            query = query.filter(func.date(Order.order_date) <= end_date)
-        
-        query = query.group_by(
-            OrderItem.product_id,
-            OrderItem.product_name,
-            OrderItem.product_sku
-        ).order_by(func.sum(OrderItem.total_price).desc())
-        
-        results = query.all()
-        
+            sales_q = sales_q.filter(func.date(Order.order_date) <= end_date)
+        sales_q = sales_q.group_by(OrderItem.product_id)
+        sales_by_product = {r.product_id: r for r in sales_q.all()}
+
+        # Fetch all active products for this business
+        all_products = self.db.query(Product).filter(
+            Product.business_id == business_id,
+            Product.deleted_at.is_(None)
+        ).order_by(Product.name).all()
+
         product_items = []
         total_revenue = Decimal("0.00")
-        
-        for result in results:
-            category_name = None
-            if result.product_id:
-                product = self.db.query(Product).filter(Product.id == result.product_id).first()
-                if product and product.category_id:
-                    category = self.db.query(Category).filter(Category.id == product.category_id).first()
-                    if category:
-                        category_name = category.name
-            
-            revenue = Decimal(str(result.total_revenue)) if result.total_revenue else Decimal("0.00")
+        total_sold = 0
+
+        for product in all_products:
+            stats = sales_by_product.get(product.id)
+            revenue = Decimal(str(stats.total_revenue)) if stats and stats.total_revenue else Decimal("0.00")
+            qty = int(stats.total_quantity) if stats and stats.total_quantity else 0
+            orders_count = int(stats.orders_count) if stats and stats.orders_count else 0
             total_revenue += revenue
-            
+            if qty > 0:
+                total_sold += 1
+
+            category_name = None
+            if product.category_id:
+                category = self.db.query(Category).filter(Category.id == product.category_id).first()
+                if category:
+                    category_name = category.name
+
             product_items.append(ProductReportItem(
-                product_name=result.product_name,
-                product_sku=result.product_sku,
+                product_name=product.name,
+                product_sku=product.sku,
                 category_name=category_name,
-                total_quantity_sold=int(result.total_quantity) if result.total_quantity else 0,
+                total_quantity_sold=qty,
                 total_revenue=revenue,
-                orders_count=int(result.orders_count) if result.orders_count else 0
+                orders_count=orders_count
             ))
-        
+
+        # Sort: products with sales first (by revenue desc), then unsold alphabetically
+        product_items.sort(key=lambda x: (-float(x.total_revenue), x.product_name))
+
         return ProductReportResponse(
             business_name=business_name,
             from_date=from_date,
             to_date=to_date,
-            total_products_sold=len(results),
+            total_products_sold=total_sold,
             total_revenue=total_revenue,
             products=product_items
         )
@@ -177,15 +182,16 @@ class ReportService:
     ) -> CustomerReportResponse:
         business = self.db.query(Business).filter(Business.id == business_id).first()
         business_name = business.business_name if business else "Unknown"
-        
-        query = self.db.query(
+
+        start_date = self._parse_date(from_date)
+        end_date = self._parse_date(to_date)
+
+        # Build order stats per customer for the date range
+        stats_q = self.db.query(
             Order.customer_id,
             func.count(Order.id).label('total_orders'),
             func.sum(
-                case(
-                    (Order.payment_status == PaymentStatus.PAID, Order.total_amount),
-                    else_=0
-                )
+                case((Order.payment_status == PaymentStatus.PAID, Order.total_amount), else_=0)
             ).label('total_spent'),
             func.max(Order.order_date).label('last_order_date')
         ).filter(
@@ -193,46 +199,39 @@ class ReportService:
             Order.deleted_at.is_(None),
             Order.customer_id.isnot(None)
         )
-        
-        start_date = self._parse_date(from_date)
-        end_date = self._parse_date(to_date)
-        
         if start_date:
-            query = query.filter(func.date(Order.order_date) >= start_date)
+            stats_q = stats_q.filter(func.date(Order.order_date) >= start_date)
         if end_date:
-            query = query.filter(func.date(Order.order_date) <= end_date)
-        
-        query = query.group_by(Order.customer_id).order_by(
-            func.sum(
-                case(
-                    (Order.payment_status == PaymentStatus.PAID, Order.total_amount),
-                    else_=0
-                )
-            ).desc()
-        )
-        
-        results = query.all()
-        
+            stats_q = stats_q.filter(func.date(Order.order_date) <= end_date)
+        stats_q = stats_q.group_by(Order.customer_id)
+        stats_by_customer = {r.customer_id: r for r in stats_q.all()}
+
+        # Fetch all active customers for this business
+        all_customers = self.db.query(Customer).filter(
+            Customer.business_id == business_id,
+            Customer.deleted_at.is_(None)
+        ).order_by(Customer.name).all()
+
         customer_items = []
         total_revenue = Decimal("0.00")
-        
-        for result in results:
-            customer = self.db.query(Customer).filter(Customer.id == result.customer_id).first()
-            if not customer:
-                continue
-            
-            spent = Decimal(str(result.total_spent)) if result.total_spent else Decimal("0.00")
+
+        for customer in all_customers:
+            stats = stats_by_customer.get(customer.id)
+            spent = Decimal(str(stats.total_spent)) if stats and stats.total_spent else Decimal("0.00")
             total_revenue += spent
-            
+
             customer_items.append(CustomerReportItem(
                 customer_name=customer.name,
                 customer_phone=customer.phone,
                 customer_email=customer.email,
-                total_orders=int(result.total_orders) if result.total_orders else 0,
+                total_orders=int(stats.total_orders) if stats and stats.total_orders else 0,
                 total_spent=spent,
-                last_order_date=self._format_date(result.last_order_date)
+                last_order_date=self._format_date(stats.last_order_date) if stats and stats.last_order_date else None
             ))
-        
+
+        # Sort: customers with most spending first, then by name
+        customer_items.sort(key=lambda x: (-float(x.total_spent), x.customer_name))
+
         return CustomerReportResponse(
             business_name=business_name,
             from_date=from_date,
