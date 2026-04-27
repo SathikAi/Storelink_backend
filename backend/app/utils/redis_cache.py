@@ -1,4 +1,5 @@
 import json
+import time
 import redis
 from typing import Optional, Any
 from app.config import settings
@@ -10,7 +11,11 @@ import hashlib
 class RedisCache:
     def __init__(self):
         self.client: Optional[redis.Redis] = None
-        if settings.REDIS_ENABLED and settings.REDIS_URL:
+        if not (settings.REDIS_ENABLED and settings.REDIS_URL):
+            return
+        # Retry up to 5 times with 2-second gaps — Docker DNS may not be ready
+        # immediately when the container starts, even after depends_on: healthy.
+        for attempt in range(1, 6):
             try:
                 self.client = redis.from_url(
                     settings.REDIS_URL,
@@ -21,9 +26,14 @@ class RedisCache:
                 )
                 self.client.ping()
                 logger.info("Redis connection established")
+                return
             except Exception as e:
-                logger.warning(f"Redis connection failed: {e}")
                 self.client = None
+                if attempt < 5:
+                    logger.warning(f"Redis connection attempt {attempt}/5 failed: {e} — retrying in 2s")
+                    time.sleep(2)
+                else:
+                    logger.warning(f"Redis connection failed after 5 attempts: {e} — running without cache")
 
     def is_available(self) -> bool:
         return self.client is not None
