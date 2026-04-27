@@ -201,7 +201,10 @@ class AuthProvider extends ChangeNotifier {
       } else {
         // Mobile: Use native Google Sign-In
         // Requires google-services.json in android/app/ and SHA-1 in Google Console
-        const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+        const webClientId = String.fromEnvironment(
+          'GOOGLE_WEB_CLIENT_ID', 
+          defaultValue: '305985439468-n5mvplf9k8dciamq05qp2ag0u95kcl9b.apps.googleusercontent.com'
+        );
         const iosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
 
         final GoogleSignIn googleSignIn = GoogleSignIn(
