@@ -207,9 +207,9 @@ async def google_auth(payload: dict, db: Session = Depends(get_db)):
     # Verify token with Supabase and get user info
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            "https://oviksvysiiktbgqllkzn.supabase.co/auth/v1/user",
+            f"{settings.SUPABASE_URL}/auth/v1/user",
             headers={"Authorization": f"Bearer {supabase_token}",
-                     "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92aWtzdnlzaWlrdGJncWxsa3puIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjkwNjksImV4cCI6MjA5MjQ0NTA2OX0.GkUUE534J8wdsOYhnt81IvZpiolDV3c186Kw1w211eU"},
+                     "apikey": settings.SUPABASE_ANON_KEY},
             timeout=10,
         )
 
@@ -292,9 +292,9 @@ async def google_complete_registration(payload: dict, db: Session = Depends(get_
     # Re-verify Supabase token
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            "https://oviksvysiiktbgqllkzn.supabase.co/auth/v1/user",
+            f"{settings.SUPABASE_URL}/auth/v1/user",
             headers={"Authorization": f"Bearer {supabase_token}",
-                     "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92aWtzdnlzaWlrdGJncWxsa3puIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjkwNjksImV4cCI6MjA5MjQ0NTA2OX0.GkUUE534J8wdsOYhnt81IvZpiolDV3c186Kw1w211eU"},
+                     "apikey": settings.SUPABASE_ANON_KEY},
             timeout=10,
         )
     if resp.status_code != 200:

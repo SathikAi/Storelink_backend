@@ -27,6 +27,7 @@ from app.schemas.store import (
     StoreReviewCreate,
 )
 from app.core.websocket_manager import manager as _ws_manager
+from app.utils.logger import logger
 import asyncio
 import json
 
@@ -53,8 +54,8 @@ def _emit(event: str, data: dict, business_id: int) -> None:
             asyncio.run_coroutine_threadsafe(
                 _ws_manager.broadcast(business_id, event, data), loop
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"WebSocket broadcast failed for business {business_id}: {e}")
 
 
 def _order_to_response(order: Order, items: List[OrderItem]) -> StoreOrderResponse:
@@ -712,7 +713,7 @@ def get_store_web(business_uuid: str, request: Request, db: Session = Depends(ge
                     this.loading = true;
                     try {{
                         const cartItems = Object.keys(this.cart).map(id => ({{ product_uuid: id, quantity: this.cart[id] }}));
-                        const res = await fetch(`/api/store/${{this.businessUuid}}/orders`, {{
+                        const res = await fetch(`/v1/store/${{this.businessUuid}}/orders`, {{
                             method: 'POST',
                             headers: {{ 'Content-Type': 'application/json' }},
                             body: JSON.stringify({{ 
@@ -736,7 +737,7 @@ def get_store_web(business_uuid: str, request: Request, db: Session = Depends(ge
                     try {{
                         const fd = new FormData();
                         fd.append('file', file);
-                        const res = await fetch(`/api/store/${{this.businessUuid}}/orders/${{this.orderComplete.order_number}}/payment-proof`, {{
+                        const res = await fetch(`/v1/store/${{this.businessUuid}}/orders/${{this.orderComplete.order_number}}/payment-proof`, {{
                             method: 'POST',
                             body: fd
                         }});
@@ -755,7 +756,7 @@ def get_store_web(business_uuid: str, request: Request, db: Session = Depends(ge
                     if(!this.feedbackRating) return alert('Please select a star rating.');
                     this.loading = true;
                     try {{
-                        const res = await fetch(`/api/store/${{this.businessUuid}}/reviews`, {{
+                        const res = await fetch(`/v1/store/${{this.businessUuid}}/reviews`, {{
                             method: 'POST',
                             headers: {{ 'Content-Type': 'application/json' }},
                             body: JSON.stringify({{ 

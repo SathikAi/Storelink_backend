@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     DODO_PAYMENTS_RETURN_URL: str = "http://localhost:9001/v1/billing/upgrade-success"
     DODO_PAYMENTS_ENVIRONMENT: str = "test_mode"  # "test_mode" | "live_mode"
 
+    # ── Supabase (Google OAuth token verification) ─────────────────────────
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+
     # ── Admin Dashboard ────────────────────────────────────────────────────
     ADMIN_DASHBOARD_KEY: str = "storelink-admin-2024"  # Override in production
 
@@ -113,3 +117,7 @@ if settings.is_production:
         raise RuntimeError("DEBUG must be disabled in production")
     if not settings.RATE_LIMIT_ENABLED:
         warnings.warn("RATE_LIMIT_ENABLED is False in production", stacklevel=1)
+    if settings.ADMIN_DASHBOARD_KEY == "storelink-admin-2024":
+        raise RuntimeError("ADMIN_DASHBOARD_KEY must be changed from the default value in production")
+    if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
+        raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be set in production")
