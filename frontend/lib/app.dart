@@ -269,11 +269,17 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             if (!mounted) return;
 
-            // Check if we are already on a public route (like /store/...)
-            // GoRouter matches the deep link even if we start at AuthWrapper
-            final location = GoRouterState.of(context).uri.toString();
+            // Check if the deep-link target is a public store route.
+            // On web, GoRouterState.uri reflects the matched route ('/'), not
+            // the browser URL when the app first loads at /store/<uuid>.
+            // Use Uri.base.path on web to read the actual browser URL.
+            final location = kIsWeb
+                ? Uri.base.path
+                : GoRouterState.of(context).uri.toString();
             if (location.startsWith('/store/')) {
-              return; // Allow public access to store
+              // Navigate to the store — GoRouter will pick up the path.
+              if (mounted) context.go(location);
+              return;
             }
 
             if (authProvider.status == AuthStatus.authenticated) {
