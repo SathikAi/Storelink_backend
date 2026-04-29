@@ -278,7 +278,7 @@ const apiCall = async (path, method='GET', body=null, adminKey='') => {
 
 /* ──────────────── PLAN BADGE ─────────── */
 const PlanBadge = ({b}) => {
-  if (b.plan==='PAID'||b.plan==='Paid') {
+  if ((b.plan==='PAID'||b.plan==='Paid') && b.subscription_type!=='trial') {
     return <span className="pill pl-pro">PAID</span>;
   }
   return <span className="pill pl-free">FREE</span>;
@@ -435,14 +435,15 @@ const PlanDonut = ({stats}) => {
   const chartRef = useRef(null);
   useEffect(()=>{
     if(!stats||!ref.current) return;
-    const totalPaid=(stats.paid_plan_businesses||0);
+    const realPaid=(stats.paid_plan_businesses||0)-(stats.trial_plan_businesses||0);
+    const realFree=(stats.free_plan_businesses||0)+(stats.trial_plan_businesses||0);
     if(chartRef.current) chartRef.current.destroy();
     chartRef.current = new Chart(ref.current.getContext('2d'),{
       type:'doughnut',
       data:{
         labels:['PAID','FREE'],
         datasets:[{
-          data:[totalPaid,stats.free_plan_businesses||0],
+          data:[realPaid,realFree],
           backgroundColor:['rgba(63,185,80,.75)','rgba(125,133,144,.2)'],
           borderColor:['#3fb950','#7d8590'],
           borderWidth:1,hoverOffset:5,
@@ -512,7 +513,7 @@ const Sidebar = ({page, setPage, adminKey, stats, onLogout, onSettings}) => (
         <div style={{padding:'0 4px'}}>
           {[
             {label:'Active Today', val:stats.active_users_today, color:'var(--grn)'},
-            {label:'Paid Users', val:stats.paid_plan_businesses||0, color:'var(--grn)'},
+            {label:'Paid Users', val:(stats.paid_plan_businesses||0)-(stats.trial_plan_businesses||0), color:'var(--grn)'},
             {label:'Conversion', val:stats.conversion_rate+'%', color:'var(--ind2)'},
           ].map(r=>(
             <div key={r.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 6px',borderBottom:'1px solid var(--s3)'}}>
@@ -623,9 +624,9 @@ const OverviewPage = ({data}) => {
       <div className="kpi-grid">
         <KPI icon="🏪" label="Total Businesses" val={stats.total_businesses} sub={`${stats.active_businesses} active`} line="ind"
           badge={stats.new_businesses_this_month>0?`+${stats.new_businesses_this_month} month`:null}/>
-        <KPI icon="💎" label="Paid Users" val={stats.paid_plan_businesses||0} sub="Active subscription" line="grn"
-          badge={(stats.paid_plan_businesses||0)>0?'Active':null}/>
-        <KPI icon="🆓" label="Free Users" val={stats.free_plan_businesses} sub="No subscription" line="mut"/>
+        <KPI icon="💎" label="Paid Users" val={(stats.paid_plan_businesses||0)-(stats.trial_plan_businesses||0)} sub="Payment completed" line="grn"
+          badge={((stats.paid_plan_businesses||0)-(stats.trial_plan_businesses||0))>0?'Active':null}/>
+        <KPI icon="🆓" label="Free Users" val={(stats.free_plan_businesses||0)+(stats.trial_plan_businesses||0)} sub="Free / Trial" line="mut"/>
         <KPI icon="🟢" label="Active Today" val={stats.active_users_today} sub="Logged in today" line="grn"
           badge={stats.active_users_today>0?'Live':null}/>
         <KPI icon="📅" label="Active (7 days)" val={stats.active_users_week} sub="Unique logins" line="ind"/>
@@ -673,10 +674,10 @@ const OverviewPage = ({data}) => {
             ))}
           </div>
           <hr className="divider"/>
-          {[
-            {l:'PAID',n:stats.paid_plan_businesses||0,pct:Math.round((stats.paid_plan_businesses||0)/total*100),cls:'pf-grn'},
-            {l:'FREE',n:stats.free_plan_businesses||0,pct:Math.round((stats.free_plan_businesses||0)/total*100),cls:'pf-mut'},
-          ].map(r=>(
+          {(()=>{const rp=(stats.paid_plan_businesses||0)-(stats.trial_plan_businesses||0);const rf=(stats.free_plan_businesses||0)+(stats.trial_plan_businesses||0);return[
+            {l:'PAID',n:rp,pct:Math.round(rp/total*100),cls:'pf-grn'},
+            {l:'FREE',n:rf,pct:Math.round(rf/total*100),cls:'pf-mut'},
+          ];})().map(r=>(
             <div key={r.l} className="plan-row">
               <span className="plan-lbl">{r.l}</span>
               <div className="plan-track">

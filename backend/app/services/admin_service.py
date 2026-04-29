@@ -428,11 +428,12 @@ class AdminService:
             Order.deleted_at.is_(None)
         ).scalar() or 0.0
 
-        # ARPU = total revenue ÷ all paid businesses (including trial)
-        arpu = float(total_revenue) / paid_plan_businesses if paid_plan_businesses > 0 else 0.0
+        # ARPU = total revenue ÷ paid businesses (excluding trial — they haven't paid yet)
+        real_paid = max(paid_plan_businesses - trial_plan_businesses, 0)
+        arpu = float(total_revenue) / real_paid if real_paid > 0 else 0.0
 
-        # Conversion rate = all paid (including trial) ÷ total businesses × 100
-        conversion_rate = round((paid_plan_businesses / total_businesses * 100), 1) if total_businesses > 0 else 0.0
+        # Conversion rate = actually paid (excl trial) ÷ total businesses × 100
+        conversion_rate = round((real_paid / total_businesses * 100), 1) if total_businesses > 0 else 0.0
 
         return PlatformStats(
             total_businesses=total_businesses,
