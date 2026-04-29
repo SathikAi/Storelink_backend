@@ -153,15 +153,13 @@ async def create_upgrade_payment(
     try:
         client = _dodo_client()
         product_id = _get_product_id(plan_type)
-        payment = client.payments.create(
-            payment_link=True,
+        session = client.checkout_sessions.create(
             product_cart=[{"product_id": product_id, "quantity": 1}],
             customer={"email": current_user.email or "", "name": business.business_name},
-            billing={"city": "India", "country": "IN", "state": "IN", "street": "-", "zipcode": "000000"},
             metadata={"business_uuid": business.uuid, "plan_type": plan_type},
             return_url=return_url,
         )
-        payment_url: str = payment.payment_link
+        payment_url: str = session.checkout_url
     except Exception as exc:
         logger.error(f"Dodo Payments create payment error: {exc}")
         if settings.ENVIRONMENT == "development":
