@@ -127,11 +127,11 @@ class _DashboardScreenState extends State<DashboardScreen>
       BottomNavigationBarItem(
           icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
       BottomNavigationBarItem(
-          icon: Icon(Icons.inventory_2_rounded), label: 'Products'),
+          icon: Icon(Icons.warehouse_rounded), label: 'Inventory'),
       BottomNavigationBarItem(
-          icon: Icon(Icons.receipt_long_rounded), label: 'Orders'),
+          icon: Icon(Icons.category_rounded), label: 'Categories'),
       BottomNavigationBarItem(
-          icon: Icon(Icons.people_rounded), label: 'Customers'),
+          icon: Icon(Icons.store_rounded), label: 'Profile'),
     ];
 
     return Container(
@@ -149,19 +149,19 @@ class _DashboardScreenState extends State<DashboardScreen>
         currentIndex: _navIndex,
         onTap: (i) async {
           if (i == 1) {
-            await context.push('/products');
+            await context.push('/inventory');
             if (mounted) {
               Provider.of<DashboardProvider>(context, listen: false)
                   .loadDashboardStats();
             }
           } else if (i == 2) {
-            await context.push('/orders');
+            await context.push('/categories');
             if (mounted) {
               Provider.of<DashboardProvider>(context, listen: false)
                   .loadDashboardStats();
             }
           } else if (i == 3) {
-            await context.push('/customers');
+            await context.push('/business-profile');
             if (mounted) {
               Provider.of<DashboardProvider>(context, listen: false)
                   .loadDashboardStats();
@@ -554,6 +554,7 @@ class _DashboardBody extends StatelessWidget {
                       sub: '${stats.products.active} active',
                       icon: Icons.inventory_2_rounded,
                       gradient: const [Color(0xFF6C63FF), Color(0xFF9B93FF)],
+                      route: '/products',
                     ),
                     _StatCard(
                       label: 'Orders',
@@ -561,6 +562,7 @@ class _DashboardBody extends StatelessWidget {
                       sub: '${stats.orders.completed} done',
                       icon: Icons.receipt_long_rounded,
                       gradient: const [Color(0xFF26D782), Color(0xFF00B09B)],
+                      route: '/orders',
                     ),
                     _StatCard(
                       label: 'Customers',
@@ -568,14 +570,15 @@ class _DashboardBody extends StatelessWidget {
                       sub: '${stats.customers.active} active',
                       icon: Icons.people_rounded,
                       gradient: const [Color(0xFFFFB142), Color(0xFFFF6F00)],
+                      route: '/customers',
                     ),
                     _StatCard(
                       label: 'Revenue',
-                      value:
-                          '₹${_compact(stats.revenue.total)}',
+                      value: '₹${_compact(stats.revenue.total)}',
                       sub: 'Total earned',
                       icon: Icons.currency_rupee_rounded,
                       gradient: const [Color(0xFFFF4757), Color(0xFFFF6B81)],
+                      route: '/reports',
                     ),
                   ],
                 ),
@@ -1313,16 +1316,20 @@ class _StatCard extends StatelessWidget {
   final String label, value, sub;
   final IconData icon;
   final List<Color> gradient;
+  final String? route;
   const _StatCard(
       {required this.label,
       required this.value,
       required this.sub,
       required this.icon,
-      required this.gradient});
+      required this.gradient,
+      this.route});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: route != null ? () => context.push(route!) : null,
+      child: Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -1385,7 +1392,7 @@ class _StatCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 
