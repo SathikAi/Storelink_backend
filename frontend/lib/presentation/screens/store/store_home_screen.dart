@@ -118,12 +118,165 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
           if (full.isNotEmpty && !banners.contains(full)) banners.add(full);
         }
 
+        // Responsive: on wide screens centre at phone width so the store
+        // looks identical in browser and on mobile.
+        final screenW = MediaQuery.of(context).size.width;
+        const maxW = 480.0;
+        final isWide = screenW > maxW;
+
+        Widget content = Column(
+          children: [
+            _Header(
+              store: store,
+              searchController: _searchController,
+              provider: provider,
+              businessUuid: widget.businessUuid,
+              onTrackOrder: () => _showTrackOrderDialog(context),
+              onSearch: (v) {
+                provider.searchProducts(widget.businessUuid, v);
+                setState(() {});
+              },
+              onClearSearch: () {
+                _searchController.clear();
+                provider.searchProducts(widget.businessUuid, '');
+                setState(() {});
+              },
+            ),
+            Expanded(
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  if (banners.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _BannerCarousel(
+                        images: banners,
+                        controller: _bannerController,
+                        currentPage: _bannerPage,
+                        onPageChanged: (i) => setState(() => _bannerPage = i),
+                      ),
+                    ),
+
+                  if (provider.categories.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _Categories(
+                        provider: provider,
+                        businessUuid: widget.businessUuid,
+                      ),
+                    ),
+
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      child: Row(
+                        children: [
+                          const Text('Products',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: _textPri)),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _glass,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: _glassBorder),
+                            ),
+                            child: Text(
+                              '${provider.products.length} items',
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: _textSec,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  if (provider.products.isEmpty)
+                    const SliverFillRemaining(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.inventory_2_outlined,
+                                size: 56, color: Colors.white24),
+                            SizedBox(height: 12),
+                            Text('No products found',
+                                style:
+                                    TextStyle(color: _textSec, fontSize: 15)),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                      sliver: SliverGrid(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) {
+                            final p = provider.products[i];
+                            return _ProductCard(
+                              product: p,
+                              cartQty: provider.cartQuantityFor(p.uuid),
+                              imageUrl: _img(
+                                (p.imageUrls != null &&
+                                        p.imageUrls!.isNotEmpty)
+                                    ? p.imageUrls!.first
+                                    : p.imageUrl,
+                              ),
+                              onAdd: () => provider.addToCart(p),
+                              onRemove: () => provider.updateQuantity(
+                                  p.uuid,
+                                  provider.cartQuantityFor(p.uuid) - 1),
+                              onTap: () => context.push(
+                                  '/store/${widget.businessUuid}/product/${p.uuid}'),
+                            );
+                          },
+                          childCount: provider.products.length,
+                        ),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.70,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
+                      ),
+                    ),
+
+                  SliverToBoxAdapter(child: _Footer(store: store)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 88)),
+                ],
+              ),
+            ),
+          ],
+        );
+
+        // On wide screens: centre the phone-width column, show side
+        // panels with the same dark gradient so the bg looks seamless.
+        if (isWide) {
+          content = Row(
+            children: [
+              Expanded(child: Container(color: _bgTop)),
+              SizedBox(
+                width: maxW,
+                child: content,
+              ),
+              Expanded(child: Container(color: _bgTop)),
+            ],
+          );
+        }
+
         return Scaffold(
           backgroundColor: Colors.transparent,
           extendBodyBehindAppBar: true,
           body: Stack(
             children: [
-              // ── Dark gradient base ──
+              // Full-width dark gradient background
               Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -135,24 +288,21 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 ),
               ),
 
-              // ── Ambient glow orbs ──
+              // Ambient glow orbs
               Positioned(
-                top: -80, right: -60,
+                top: -80, right: isWide ? (screenW - maxW) / 2 - 60 : -60,
                 child: Container(
                   width: 260, height: 260,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
-                      colors: [
-                        _orange.withOpacity(0.18),
-                        Colors.transparent,
-                      ],
+                      colors: [_orange.withOpacity(0.18), Colors.transparent],
                     ),
                   ),
                 ),
               ),
               Positioned(
-                bottom: 200, left: -80,
+                bottom: 200, left: isWide ? (screenW - maxW) / 2 - 80 : -80,
                 child: Container(
                   width: 220, height: 220,
                   decoration: BoxDecoration(
@@ -167,160 +317,22 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 ),
               ),
 
-              // ── Main content ──
-              Column(
-                children: [
-                  _Header(
-                    store: store,
-                    searchController: _searchController,
-                    provider: provider,
-                    businessUuid: widget.businessUuid,
-                    onTrackOrder: () => _showTrackOrderDialog(context),
-                    onSearch: (v) {
-                      provider.searchProducts(widget.businessUuid, v);
-                      setState(() {});
-                    },
-                    onClearSearch: () {
-                      _searchController.clear();
-                      provider.searchProducts(widget.businessUuid, '');
-                      setState(() {});
-                    },
-                  ),
-                  Expanded(
-                    child: CustomScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      slivers: [
-                        // Banner carousel
-                        if (banners.isNotEmpty)
-                          SliverToBoxAdapter(
-                            child: _BannerCarousel(
-                              images: banners,
-                              controller: _bannerController,
-                              currentPage: _bannerPage,
-                              onPageChanged: (i) =>
-                                  setState(() => _bannerPage = i),
-                            ),
-                          ),
-
-                        // Categories
-                        if (provider.categories.isNotEmpty)
-                          SliverToBoxAdapter(
-                            child: _Categories(
-                              provider: provider,
-                              businessUuid: widget.businessUuid,
-                            ),
-                          ),
-
-                        // Section header
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                            child: Row(
-                              children: [
-                                const Text('Products',
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                        color: _textPri)),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: _glass,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border:
-                                        Border.all(color: _glassBorder),
-                                  ),
-                                  child: Text(
-                                    '${provider.products.length} items',
-                                    style: const TextStyle(
-                                        fontSize: 11,
-                                        color: _textSec,
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Products or empty
-                        if (provider.products.isEmpty)
-                          const SliverFillRemaining(
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.inventory_2_outlined,
-                                      size: 56, color: Colors.white24),
-                                  SizedBox(height: 12),
-                                  Text('No products found',
-                                      style: TextStyle(
-                                          color: _textSec, fontSize: 15)),
-                                ],
-                              ),
-                            ),
-                          )
-                        else
-                          SliverPadding(
-                            padding:
-                                const EdgeInsets.fromLTRB(12, 4, 12, 8),
-                            sliver: SliverGrid(
-                              delegate: SliverChildBuilderDelegate(
-                                (context, i) {
-                                  final p = provider.products[i];
-                                  return _ProductCard(
-                                    product: p,
-                                    cartQty:
-                                        provider.cartQuantityFor(p.uuid),
-                                    imageUrl: _img(
-                                      (p.imageUrls != null &&
-                                              p.imageUrls!.isNotEmpty)
-                                          ? p.imageUrls!.first
-                                          : p.imageUrl,
-                                    ),
-                                    onAdd: () => provider.addToCart(p),
-                                    onRemove: () => provider.updateQuantity(
-                                        p.uuid,
-                                        provider.cartQuantityFor(p.uuid) -
-                                            1),
-                                    onTap: () => context.push(
-                                        '/store/${widget.businessUuid}/product/${p.uuid}'),
-                                  );
-                                },
-                                childCount: provider.products.length,
-                              ),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                childAspectRatio: 0.70,
-                                crossAxisSpacing: 10,
-                                mainAxisSpacing: 10,
-                              ),
-                            ),
-                          ),
-
-                        // Footer
-                        SliverToBoxAdapter(
-                          child: _Footer(store: store),
-                        ),
-
-                        // Bottom padding for cart bar
-                        const SliverToBoxAdapter(
-                            child: SizedBox(height: 88)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              content,
             ],
           ),
           bottomSheet: provider.cartItemCount > 0
-              ? _CartBar(
-                  provider: provider,
-                  businessUuid: widget.businessUuid,
-                )
+              ? isWide
+                  ? Center(
+                      child: SizedBox(
+                        width: maxW,
+                        child: _CartBar(
+                            provider: provider,
+                            businessUuid: widget.businessUuid),
+                      ),
+                    )
+                  : _CartBar(
+                      provider: provider,
+                      businessUuid: widget.businessUuid)
               : null,
         );
       },
