@@ -5,6 +5,7 @@ class AdminBusinessListItem {
   final String phone;
   final String? email;
   final String plan;
+  final String? subscriptionType;
   final DateTime? planExpiryDate;
   final bool isActive;
   final DateTime createdAt;
@@ -19,6 +20,7 @@ class AdminBusinessListItem {
     required this.phone,
     this.email,
     required this.plan,
+    this.subscriptionType,
     this.planExpiryDate,
     required this.isActive,
     required this.createdAt,
@@ -35,6 +37,7 @@ class AdminBusinessListItem {
       phone: json['phone'] as String,
       email: json['email'] as String?,
       plan: json['plan'] as String,
+      subscriptionType: json['subscription_type'] as String?,
       planExpiryDate: json['plan_expiry_date'] != null
           ? DateTime.parse(json['plan_expiry_date'] as String)
           : null,
@@ -91,6 +94,7 @@ class PlatformStats {
   final int inactiveBusinesses;
   final int freePlanBusinesses;
   final int paidPlanBusinesses;
+  final int trialPlanBusinesses;
   final int totalUsers;
   final int activeUsers;
   final int superAdmins;
@@ -109,6 +113,7 @@ class PlatformStats {
     required this.inactiveBusinesses,
     required this.freePlanBusinesses,
     required this.paidPlanBusinesses,
+    required this.trialPlanBusinesses,
     required this.totalUsers,
     required this.activeUsers,
     required this.superAdmins,
@@ -129,6 +134,7 @@ class PlatformStats {
       inactiveBusinesses: json['inactive_businesses'] as int,
       freePlanBusinesses: json['free_plan_businesses'] as int,
       paidPlanBusinesses: json['paid_plan_businesses'] as int,
+      trialPlanBusinesses: json['trial_plan_businesses'] as int? ?? 0,
       totalUsers: json['total_users'] as int,
       activeUsers: json['active_users'] as int,
       superAdmins: json['super_admins'] as int,

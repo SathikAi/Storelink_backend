@@ -106,14 +106,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   Colors.green,
                                 ),
                                 _buildStatCard(
-                                  'Free Plan',
-                                  stats.freePlanBusinesses.toString(),
+                                  'FREE Plan',
+                                  (stats.freePlanBusinesses + stats.trialPlanBusinesses).toString(),
                                   Icons.free_breakfast,
                                   Colors.orange,
                                 ),
                                 _buildStatCard(
-                                  'Paid Plan',
-                                  stats.paidPlanBusinesses.toString(),
+                                  'PAID Plan',
+                                  (stats.paidPlanBusinesses - stats.trialPlanBusinesses).toString(),
                                   Icons.star,
                                   Colors.purple,
                                 ),
@@ -316,6 +316,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildPlanChart(dynamic stats) {
+    final freeCount = stats.freePlanBusinesses + stats.trialPlanBusinesses;
+    final paidCount = stats.paidPlanBusinesses - stats.trialPlanBusinesses;
     return Container(
       height: 200,
       padding: const EdgeInsets.all(16),
@@ -341,8 +343,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 centerSpaceRadius: 40,
                 sections: [
                   PieChartSectionData(
-                    value: stats.freePlanBusinesses.toDouble(),
-                    title: '${stats.freePlanBusinesses}',
+                    value: freeCount.toDouble(),
+                    title: '$freeCount',
                     color: Colors.orange,
                     radius: 50,
                     titleStyle: const TextStyle(
@@ -352,8 +354,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                   ),
                   PieChartSectionData(
-                    value: stats.paidPlanBusinesses.toDouble(),
-                    title: '${stats.paidPlanBusinesses}',
+                    value: paidCount.toDouble(),
+                    title: '$paidCount',
                     color: Colors.purple,
                     radius: 50,
                     titleStyle: const TextStyle(
@@ -371,9 +373,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildChartLegend('Free Plan', Colors.orange),
+                _buildChartLegend('FREE Plan', Colors.orange),
                 const SizedBox(height: 8),
-                _buildChartLegend('Paid Plan', Colors.purple),
+                _buildChartLegend('PAID Plan', Colors.purple),
               ],
             ),
           ),

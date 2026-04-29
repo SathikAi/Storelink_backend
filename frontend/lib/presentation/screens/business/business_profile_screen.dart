@@ -211,17 +211,21 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                 style: Theme.of(context).textTheme.headlineMedium,
                               ),
                               const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: business.plan == 'PAID' ? Colors.green : Colors.orange,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  '${business.plan} Plan',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                ),
-                              ),
+                              Builder(builder: (_) {
+                                final isPaid = business.plan == 'PAID' &&
+                                    business.subscriptionType != 'trial';
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: isPaid ? Colors.green : Colors.orange,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    isPaid ? 'PAID Plan' : 'FREE Plan',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                );
+                              }),
                               if (business.planExpiryDate != null) ...[
                                 const SizedBox(height: 8),
                                 Text(

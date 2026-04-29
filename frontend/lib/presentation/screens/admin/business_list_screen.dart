@@ -202,25 +202,25 @@ class _BusinessListScreenState extends State<BusinessListScreen> {
                           ),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: business.plan == 'PAID' 
-                              ? Colors.purple.shade50 
-                              : Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          business.plan,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: business.plan == 'PAID' 
-                                ? Colors.purple 
-                                : Colors.orange,
+                      Builder(builder: (_) {
+                        final isPaid = business.plan == 'PAID' &&
+                            business.subscriptionType != 'trial';
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isPaid ? Colors.purple.shade50 : Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ),
-                      ),
+                          child: Text(
+                            isPaid ? 'PAID' : 'FREE',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isPaid ? Colors.purple : Colors.orange,
+                            ),
+                          ),
+                        );
+                      }),
                     ],
                   ),
                   const SizedBox(height: 4),
