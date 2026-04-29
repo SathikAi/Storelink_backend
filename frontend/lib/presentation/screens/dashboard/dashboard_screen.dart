@@ -982,11 +982,10 @@ class _StoreShareCard extends StatelessWidget {
   final dynamic business;
   const _StoreShareCard({required this.business});
 
-  void _openInBrowser(String url, BuildContext context) {
-    // Navigate directly inside the Flutter app — no browser/web server needed
-    final uuid = business?.uuid as String?;
-    if (uuid != null && uuid.isNotEmpty) {
-      context.push('/store/$uuid');
+  Future<void> _openInBrowser(String url, BuildContext context) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
