@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -23,6 +24,9 @@ import 'presentation/screens/store/order_confirmation_screen.dart';
 import 'presentation/screens/store/order_status_screen.dart';
 import 'presentation/screens/admin/admin_portal_screen.dart';
 import 'core/services/biometric_service.dart';
+import 'core/services/debug_log_service.dart';
+import 'core/utils/web_bridge.dart'
+    if (dart.library.html) 'core/utils/web_bridge_web.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/dashboard_provider.dart';
 import 'presentation/providers/order_provider.dart';
@@ -51,7 +55,10 @@ final _router = GoRouter(
     // ── Auth / Business owner routes ──────────────────────────────────────
     GoRoute(path: '/', builder: (_, __) => const AuthWrapper()),
     GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-    GoRoute(path: '/auth-callback', builder: (_, __) => const _GoogleAuthCallbackScreen()),
+    GoRoute(
+      path: '/auth-callback',
+      builder: (context, state) => _GoogleAuthCallbackScreen(deepLinkUri: state.uri),
+    ),
     GoRoute(path: '/dashboard', builder: (_, __) => const DashboardScreen()),
     GoRoute(path: '/business-profile', builder: (_, __) => const BusinessProfileScreen()),
     GoRoute(path: '/reports', builder: (_, __) => const ReportsScreen()),
@@ -164,8 +171,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused) {
       _appWasInBackground = true;
     } else if (state == AppLifecycleState.resumed && _appWasInBackground) {
       _appWasInBackground = false;
@@ -183,6 +189,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     if (bioEnabled) {
       _isAuthenticating = true;
       final ok = await _bio.authenticate();
+      _appWasInBackground = false;
       _isAuthenticating = false;
       if (!mounted) return;
       if (!ok) {
@@ -216,7 +223,9 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     }
 
     _isAuthenticating = true;
+    _appWasInBackground = false;
     final ok = await _bio.authenticate();
+    _appWasInBackground = false;
     _isAuthenticating = false;
 
     if (!mounted) return;
@@ -284,9 +293,15 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   }
 }
 
-/// Handles the redirect back from Supabase Google OAuth on web.
+/// Handles the redirect back from Supabase Google OAuth.
+/// On web: the browser redirects here after OAuth.
+/// On mobile: GoRouter navigates here when the deep link fires
+/// (com.storelink.app://auth-callback?code=xxx). We manually exchange
+/// the PKCE code because app_links may not receive the URI when GoRouter
+/// has already consumed the navigation intent.
 class _GoogleAuthCallbackScreen extends StatefulWidget {
-  const _GoogleAuthCallbackScreen();
+  final Uri? deepLinkUri;
+  const _GoogleAuthCallbackScreen({this.deepLinkUri});
 
   @override
   State<_GoogleAuthCallbackScreen> createState() => _GoogleAuthCallbackScreenState();
@@ -300,12 +315,46 @@ class _GoogleAuthCallbackScreenState extends State<_GoogleAuthCallbackScreen> {
   }
 
   Future<void> _handleCallback() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final deepLinkUri = widget.deepLinkUri;
+
+    // ── Web-to-app bridge path ────────────────────────────────────────────────
+    // When com.storelink.app://auth-callback arrives with access_token instead
+    // of a PKCE code, it came from the web app bridging us the Supabase token.
+    if (!kIsWeb &&
+        deepLinkUri != null &&
+        deepLinkUri.queryParameters.containsKey('access_token')) {
+      DebugLog.i('GoogleAuth', 'callback-screen: branch=web-token-bridge');
+      final accessToken = deepLinkUri.queryParameters['access_token']!;
+      final result = await authProvider.handleWebRedirectToken(accessToken);
+      if (!mounted) return;
+      DebugLog.i('GoogleAuth', 'callback-screen: web-token-bridge result=${result['status']}');
+      _routeFromResult(result, fallbackToken: accessToken);
+      return;
+    }
+
+    // ── Passive path ─────────────────────────────────────────────────────────
+    // loginWithGoogle() is still running — just wait for it to resolve.
+    if (!kIsWeb && authProvider.isProcessingGoogleCallback) {
+      DebugLog.i('GoogleAuth', 'callback-screen: branch=passive, awaiting completer');
+      final result = await authProvider.googleCallbackFuture!.timeout(
+        const Duration(seconds: 60),
+        onTimeout: () => {'status': 'error', 'message': 'Timed out'},
+      );
+      if (!mounted) return;
+      DebugLog.i('GoogleAuth', 'callback-screen: passive result=${result['status']}');
+      _routeFromResult(result, fallbackToken: '');
+      return;
+    }
+
+    // ── Cold-start / web path ─────────────────────────────────────────────────
+    // App was killed and re-opened via deep link (mobile), or this is a web
+    // callback after redirect. supabase_flutter handles PKCE internally — we
+    // just wait for the session to appear.
+    DebugLog.i('GoogleAuth', 'callback-screen: branch=cold-start kIsWeb=$kIsWeb');
     final supabase = Supabase.instance.client;
 
-    // supabase_flutter SDK auto-exchanges the ?code= on initialize().
-    // Wait for that event rather than manually calling exchangeCodeForSession.
     Session? session = supabase.auth.currentSession;
-
     if (session == null) {
       try {
         final event = await supabase.auth.onAuthStateChange
@@ -313,7 +362,7 @@ class _GoogleAuthCallbackScreenState extends State<_GoogleAuthCallbackScreen> {
                 e.event == AuthChangeEvent.signedIn ||
                 e.event == AuthChangeEvent.tokenRefreshed)
             .first
-            .timeout(const Duration(seconds: 15));
+            .timeout(const Duration(seconds: 20));
         session = event.session;
       } catch (_) {
         session = supabase.auth.currentSession;
@@ -323,23 +372,38 @@ class _GoogleAuthCallbackScreenState extends State<_GoogleAuthCallbackScreen> {
     if (!mounted) return;
 
     if (session == null) {
+      DebugLog.i('GoogleAuth', 'callback-screen: no session, going to /login');
       context.go('/login');
       return;
     }
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    DebugLog.i('GoogleAuth', 'callback-screen: session obtained, kIsWeb=$kIsWeb');
+
+    // On web running on Android: pass tokens to the native app via deep link.
+    // The native app will call handleWebRedirectToken and navigate to dashboard.
+    // We also continue the web flow below as a fallback in case the app doesn't open.
+    if (kIsWeb) {
+      tryOpenMobileApp(session.accessToken, session.refreshToken ?? '');
+      // Brief wait so the intent has time to fire before we also navigate on web.
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
+    }
+
     final result = await authProvider.loginWithGoogleToken(session.accessToken);
     if (!mounted) return;
+    DebugLog.i('GoogleAuth', 'callback-screen: route-decision ${result['status']}');
+    _routeFromResult(result, fallbackToken: session.accessToken);
+  }
 
+  void _routeFromResult(Map<String, dynamic> result, {required String fallbackToken}) {
     switch (result['status']) {
       case 'logged_in':
         context.go('/dashboard');
         break;
       case 'needs_registration':
-        // New Google user — push registration screen
         Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => GoogleRegisterScreen(
-            supabaseToken: result['token'] ?? session!.accessToken,
+            supabaseToken: result['token'] ?? fallbackToken,
             googleEmail: result['email'] ?? '',
             googleName: result['name'] ?? '',
           ),

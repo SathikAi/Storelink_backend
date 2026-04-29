@@ -2,9 +2,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../data/models/business_model.dart';
 import '../../data/repositories/auth_repository.dart';
-import '../../domain/entities/user_entity.dart';
 import '../../domain/entities/business_entity.dart';
+import '../../domain/entities/user_entity.dart';
+import '../../core/services/debug_log_service.dart';
 
 // Returns true if user registered within the last 30 days (free trial window).
 bool _isInTrialPeriod(DateTime registeredAt) {
@@ -26,6 +29,9 @@ class AuthProvider extends ChangeNotifier {
   BusinessEntity? _business;
   String? _accessToken;
   String? _error;
+  bool _processingGoogleCallback = false;
+  Completer<Map<String, dynamic>>? _googleCallbackCompleter;
+  StreamSubscription<AuthState>? _googleOAuthSub;
 
   AuthProvider(this._authRepository);
 
@@ -35,6 +41,8 @@ class AuthProvider extends ChangeNotifier {
   String? get accessToken => _accessToken;
   String? get error => _error;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
+  bool get isProcessingGoogleCallback => _processingGoogleCallback;
+  Future<Map<String, dynamic>>? get googleCallbackFuture => _googleCallbackCompleter?.future;
 
   /// True if on PAID plan OR within 30-day free trial from registration.
   bool get isPro {
@@ -71,12 +79,19 @@ class AuthProvider extends ChangeNotifier {
         _accessToken = await _authRepository.getAccessToken();
         _status = AuthStatus.authenticated;
       } else {
-        // getCurrentUser returned null only when token is truly invalid (401).
-        _status = AuthStatus.unauthenticated;
+        // getCurrentUser returned null — either the token is invalid or it was a network error.
+        // If the Dio interceptor cleared tokens (refresh also failed), isAuthenticated() returns false → logout.
+        // If tokens still exist, this was a transient error → keep authenticated.
+        final stillHasToken = await _authRepository.isAuthenticated();
+        if (!stillHasToken) {
+          _status = AuthStatus.unauthenticated;
+        } else {
+          _accessToken = await _authRepository.getAccessToken();
+          _status = AuthStatus.authenticated;
+        }
       }
     } on DioException catch (e) {
-      // Network/timeout error — keep user authenticated with cached data.
-      // They'll see an error when they try to load data, but won't be force-logged out.
+      // DioException that escaped getCurrentUser (shouldn't happen often, but guard anyway).
       if (e.type == DioExceptionType.connectionError ||
           e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout ||
@@ -179,88 +194,162 @@ class AuthProvider extends ChangeNotifier {
   ///   - `{'status': 'needs_registration', 'email': ..., 'name': ..., 'token': ...}` → new user
   ///   - `{'status': 'error', 'message': ...}` → failure
   Future<Map<String, dynamic>> loginWithGoogle() async {
+    _processingGoogleCallback = true;
+    _googleCallbackCompleter = Completer<Map<String, dynamic>>();
+
     try {
       _status = AuthStatus.loading;
       _error = null;
       notifyListeners();
 
       final supabase = Supabase.instance.client;
-      String? supabaseToken;
 
       if (kIsWeb) {
-        // Web: use Supabase OAuth redirect
+        DebugLog.i('GoogleAuth', 'web: initiating OAuth redirect');
         await supabase.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: '${const String.fromEnvironment('WEB_APP_URL', defaultValue: 'https://storelink.sbs')}/auth-callback',
         );
-        // The page redirects — auth state handled in app router on return
         _status = AuthStatus.unauthenticated;
         notifyListeners();
-        return {'status': 'redirect'};
-      } else {
-        // Mobile: Supabase web OAuth → opens system browser → deep link returns to app
-        final completer = Completer<Session?>();
-        StreamSubscription<AuthState>? sub;
-        sub = supabase.auth.onAuthStateChange.listen((data) {
-          if (data.event == AuthChangeEvent.signedIn && data.session != null) {
-            if (!completer.isCompleted) completer.complete(data.session);
-            sub?.cancel();
-          }
-        });
+        final result = {'status': 'redirect'};
+        if (!_googleCallbackCompleter!.isCompleted) _googleCallbackCompleter!.complete(result);
+        return result;
+      }
 
-        await supabase.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: 'com.storelink.app://auth-callback',
-        );
+      // Mobile: listen for auth session from Supabase (direct custom-scheme path).
+      // supabase_flutter handles the PKCE exchange internally via app_links.
+      // handleWebRedirectToken() can also complete _googleCallbackCompleter externally
+      // when the web-to-app bridge delivers tokens via com.storelink.app://auth-callback?access_token=
+      DebugLog.i('GoogleAuth', 'mobile: attaching auth listener');
+      _googleOAuthSub = supabase.auth.onAuthStateChange.listen((data) {
+        final isAuth = data.event == AuthChangeEvent.signedIn ||
+            data.event == AuthChangeEvent.tokenRefreshed;
+        if (isAuth && data.session != null) {
+          DebugLog.i('GoogleAuth', 'oauth-event-received: ${data.event}');
+          _processGoogleSession(data.session!);
+        }
+      });
 
-        Session? session;
-        try {
-          session = await completer.future.timeout(const Duration(minutes: 3));
-        } catch (_) {
-          sub?.cancel();
+      DebugLog.i('GoogleAuth', 'browser-launching');
+      await supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'com.storelink.app://auth-callback',
+        authScreenLaunchMode: LaunchMode.externalApplication,
+      );
+
+      // Wait for the completer — completed by either:
+      //   • _processGoogleSession (direct custom-scheme path: signedIn event fires)
+      //   • handleWebRedirectToken (web-to-app bridge: access_token delivered via deep link)
+      final result = await _googleCallbackCompleter!.future.timeout(
+        const Duration(minutes: 3),
+        onTimeout: () {
+          DebugLog.i('GoogleAuth', 'loginWithGoogle: 3-min timeout');
           _status = AuthStatus.unauthenticated;
           notifyListeners();
           return {'status': 'cancelled'};
-        }
-
-        supabaseToken = session?.accessToken;
-        if (supabaseToken == null) {
-          _status = AuthStatus.unauthenticated;
-          notifyListeners();
-          return {'status': 'cancelled'};
-        }
-      }
-
-      // Call our backend
-      final data = await _authRepository.googleAuth(supabaseToken);
-
-      if (data['needs_registration'] == true) {
-        _status = AuthStatus.unauthenticated;
-        notifyListeners();
-        return {
-          'status': 'needs_registration',
-          'email': data['google_email'] ?? '',
-          'name': data['google_name'] ?? '',
-          'token': data['supabase_token'] ?? supabaseToken,
-        };
-      }
-
-      // Existing user — log them in
-      _user = data['user'] != null ? _parseUser(data) : null;
-      _business = data['business'] != null ? _parseBusiness(data) : null;
-      _accessToken = data['tokens']?['access_token'];
-      _status = AuthStatus.authenticated;
+        },
+      );
+      return result;
+    } catch (e) {
+      DebugLog.i('GoogleAuth', 'loginWithGoogle error: $e');
+      _error = _friendlyError(e);
+      _status = AuthStatus.unauthenticated;
       notifyListeners();
-      return {'status': 'logged_in'};
+      final result = {'status': 'error', 'message': _error};
+      if (!(_googleCallbackCompleter?.isCompleted ?? true)) {
+        _googleCallbackCompleter!.complete(result);
+      }
+      return result;
+    } finally {
+      _googleOAuthSub?.cancel();
+      _googleOAuthSub = null;
+      _processingGoogleCallback = false;
+    }
+  }
+
+  /// Called by the onAuthStateChange listener (direct custom-scheme path).
+  Future<void> _processGoogleSession(Session session) async {
+    if (_googleCallbackCompleter?.isCompleted ?? true) return;
+    try {
+      DebugLog.i('GoogleAuth', 'backend-call-start (session path)');
+      final data = await _authRepository.googleAuth(session.accessToken);
+      DebugLog.i('GoogleAuth', 'backend-call-end: needs_registration=${data['needs_registration']}');
+      final result = _buildGoogleResult(data, session.accessToken);
+      _applyGoogleResult(data);
+      if (!(_googleCallbackCompleter?.isCompleted ?? true)) {
+        _googleCallbackCompleter!.complete(result);
+      }
+    } catch (e) {
+      DebugLog.i('GoogleAuth', 'backend error: $e');
+      _error = _friendlyError(e);
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      if (!(_googleCallbackCompleter?.isCompleted ?? true)) {
+        _googleCallbackCompleter!.complete({'status': 'error', 'message': _error});
+      }
+    }
+  }
+
+  /// Called by _GoogleAuthCallbackScreen when it receives access_token via the
+  /// web-to-app bridge (com.storelink.app://auth-callback?access_token=xxx).
+  /// Works whether or not loginWithGoogle() is still in flight.
+  Future<Map<String, dynamic>> handleWebRedirectToken(String accessToken) async {
+    DebugLog.i('GoogleAuth', 'handleWebRedirectToken: processingCallback=$_processingGoogleCallback');
+    try {
+      final data = await _authRepository.googleAuth(accessToken);
+      final result = _buildGoogleResult(data, accessToken);
+      _applyGoogleResult(data);
+      // Complete the in-flight loginWithGoogle() if it's still waiting.
+      if (!(_googleCallbackCompleter?.isCompleted ?? true)) {
+        _googleCallbackCompleter!.complete(result);
+      }
+      return result;
     } catch (e) {
       _error = _friendlyError(e);
       _status = AuthStatus.unauthenticated;
       notifyListeners();
-      return {'status': 'error', 'message': _error};
+      final result = {'status': 'error', 'message': _error};
+      if (!(_googleCallbackCompleter?.isCompleted ?? true)) {
+        _googleCallbackCompleter!.complete(result);
+      }
+      return result;
     }
   }
 
+  Map<String, dynamic> _buildGoogleResult(Map<String, dynamic> data, String fallbackToken) {
+    if (data['needs_registration'] == true) {
+      DebugLog.i('GoogleAuth', 'needs-registration-detected');
+      return {
+        'status': 'needs_registration',
+        'email': data['google_email'] ?? '',
+        'name': data['google_name'] ?? '',
+        'token': data['supabase_token'] ?? fallbackToken,
+      };
+    }
+    DebugLog.i('GoogleAuth', 'logged_in successfully');
+    return {'status': 'logged_in'};
+  }
+
+  void _applyGoogleResult(Map<String, dynamic> data) {
+    if (data['needs_registration'] == true) {
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return;
+    }
+    _user = data['user'] != null ? _parseUser(data) : null;
+    _business = data['business'] != null ? _parseBusiness(data) : null;
+    _accessToken = data['tokens']?['access_token'];
+    _status = AuthStatus.authenticated;
+    notifyListeners();
+  }
+
   Future<Map<String, dynamic>> loginWithGoogleToken(String supabaseToken) async {
+    if (_processingGoogleCallback) {
+      DebugLog.i('GoogleAuth', 'loginWithGoogleToken: callback in flight, awaiting completer');
+      return await _googleCallbackCompleter!.future;
+    }
+
     try {
       _status = AuthStatus.loading;
       _error = null;
@@ -350,15 +439,9 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  BusinessEntity? _parseBusiness(Map<String, dynamic> data) {
+  BusinessModel? _parseBusiness(Map<String, dynamic> data) {
     try {
-      final b = data['business'] as Map<String, dynamic>;
-      return BusinessEntity(
-        uuid: b['uuid'] ?? '',
-        businessName: b['business_name'] ?? '',
-        plan: b['plan'] ?? 'FREE',
-        isActive: b['is_active'] ?? true,
-      );
+      return BusinessModel.fromJson(data['business'] as Map<String, dynamic>);
     } catch (_) {
       return null;
     }
@@ -483,14 +566,19 @@ class AuthProvider extends ChangeNotifier {
         case DioExceptionType.badResponse:
           final status = e.response?.statusCode;
           final msg = e.response?.data?['detail'];
-          if (msg != null) return msg.toString();
-          if (status == 401) return 'Invalid phone number or password.';
+          if (msg != null && msg.toString().isNotEmpty) return msg.toString();
+          if (status == 401) return 'Authentication failed. Please try again.';
           if (status == 400) return 'Invalid details. Please check and try again.';
           if (status == 409) return 'Account already exists with this phone number.';
           return 'Server error ($status). Please try again.';
         default:
           return 'Something went wrong. Please try again.';
       }
+    }
+    // Pass through specific error messages from our datasource (e.g. "Phone number already registered")
+    final rawMsg = e.toString().replaceFirst('Exception: ', '');
+    if (rawMsg.isNotEmpty && rawMsg != 'Exception' && !rawMsg.startsWith('type \'Null\'')) {
+      return rawMsg;
     }
     return 'Something went wrong. Please try again.';
   }

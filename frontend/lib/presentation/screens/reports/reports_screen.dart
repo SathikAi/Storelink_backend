@@ -18,6 +18,7 @@ class _ReportsScreenState extends State<ReportsScreen>
   late TabController _tabController;
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
+  int _previousTabIndex = 0;
 
   @override
   void initState() {
@@ -35,7 +36,8 @@ class _ReportsScreenState extends State<ReportsScreen>
   }
 
   void _onTabChanged() {
-    if (_tabController.indexIsChanging) {
+    if (_tabController.index != _previousTabIndex) {
+      _previousTabIndex = _tabController.index;
       _loadCurrentReport();
     }
   }

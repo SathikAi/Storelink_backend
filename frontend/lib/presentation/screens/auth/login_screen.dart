@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/debug_log_service.dart';
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -92,6 +93,8 @@ class _LoginScreenState extends State<LoginScreen>
         ));
         break;
       case 'cancelled':
+        _showError('Google sign-in was cancelled. Please try again.');
+        break;
       case 'redirect':
         break;
       default:
@@ -152,17 +155,25 @@ class _LoginScreenState extends State<LoginScreen>
                         children: [
                       const SizedBox(height: 40),
                       // Logo + Brand
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.18),
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                              color: Colors.white.withOpacity(0.3), width: 1.5),
+                      GestureDetector(
+                        onLongPress: () async {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Sharing debug log…')),
+                          );
+                          await DebugLog.shareViaSystem();
+                        },
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                                color: Colors.white.withOpacity(0.3), width: 1.5),
+                          ),
+                          child: const Icon(Icons.store_rounded,
+                              size: 38, color: Colors.white),
                         ),
-                        child: const Icon(Icons.store_rounded,
-                            size: 38, color: Colors.white),
                       ),
                       const SizedBox(height: 16),
                       const Text(

@@ -42,6 +42,8 @@ async def register(data: RegisterRequest, db: Session = Depends(get_db)):
                 "banner_url": business.banner_url,
                 "phone": business.phone,
                 "email": business.email,
+                "plan_expiry_date": business.plan_expiry_date.isoformat() if business.plan_expiry_date else None,
+                "subscription_type": business.subscription_type,
             },
             "tokens": tokens
         }
@@ -71,6 +73,8 @@ async def login(data: LoginRequest, db: Session = Depends(get_db)):
                 "banner_url": business.banner_url,
                 "phone": business.phone,
                 "email": business.email,
+                "plan_expiry_date": business.plan_expiry_date.isoformat() if business.plan_expiry_date else None,
+                "subscription_type": business.subscription_type,
             } if business else None,
             "tokens": tokens
         }
@@ -121,6 +125,8 @@ async def verify_otp(data: OTPVerifyRequest, db: Session = Depends(get_db)):
                     "banner_url": business.banner_url,
                     "phone": business.phone,
                     "email": business.email,
+                    "plan_expiry_date": business.plan_expiry_date.isoformat() if business.plan_expiry_date else None,
+                    "subscription_type": business.subscription_type,
                 } if business else None,
                 "tokens": tokens
             }
@@ -270,6 +276,8 @@ async def google_auth(payload: dict, db: Session = Depends(get_db)):
                     "banner_url": business.banner_url,
                     "phone": business.phone,
                     "email": business.email,
+                    "plan_expiry_date": business.plan_expiry_date.isoformat() if business.plan_expiry_date else None,
+                    "subscription_type": business.subscription_type,
                 } if business else None,
                 "tokens": tokens,
             }
@@ -386,7 +394,7 @@ async def google_complete_registration(payload: dict, db: Session = Depends(get_
                 }
             )
         else:
-            raise HTTPException(status_code=400, detail="Phone number already registered with a different account")
+            raise HTTPException(status_code=409, detail="This phone number is already registered with a different account. Please log in with your phone number and password instead.")
 
     # Create user with random password (Google users don't use password login)
     rand_pw = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
@@ -444,6 +452,8 @@ async def google_complete_registration(payload: dict, db: Session = Depends(get_
                 "banner_url": business.banner_url,
                 "phone": business.phone,
                 "email": business.email,
+                "plan_expiry_date": business.plan_expiry_date.isoformat() if business.plan_expiry_date else None,
+                "subscription_type": business.subscription_type,
             },
             "tokens": tokens,
         }

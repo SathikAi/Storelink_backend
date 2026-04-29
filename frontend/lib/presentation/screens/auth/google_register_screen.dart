@@ -110,13 +110,14 @@ class _GoogleRegisterScreenState extends State<GoogleRegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    const Text('Just a few more details',
+                    const Text('One more step',
                         style: TextStyle(
                             fontSize: 20, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
-                    const Text('Set up your business account',
+                    const Text(
+                        'If you already have a StoreLink account, enter your registered phone number to link it. Otherwise, enter a new number to create an account.',
                         style: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 14)),
+                            color: AppColors.textSecondary, fontSize: 13)),
                     const SizedBox(height: 24),
                     TextFormField(
                       controller: _phoneController,
@@ -165,7 +166,7 @@ class _GoogleRegisterScreenState extends State<GoogleRegisterScreen> {
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2, color: Colors.white),
                               )
-                            : const Text('Create Account',
+                            : const Text('Continue',
                                 style: TextStyle(
                                     fontSize: 16, fontWeight: FontWeight.w700)),
                       ),

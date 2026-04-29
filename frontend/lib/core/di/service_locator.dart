@@ -115,9 +115,10 @@ class ServiceLocator {
                 data: {'refresh_token': refreshToken},
               );
 
-              if (response.statusCode == 200 && response.data['success']) {
-                final newAccessToken = response.data['data']['access_token'] as String;
-                final newRefreshToken = response.data['data']['refresh_token'] as String;
+              final tokensMap = response.data?['data']?['tokens'] as Map<String, dynamic>?;
+              if (response.statusCode == 200 && response.data['success'] == true && tokensMap != null) {
+                final newAccessToken = tokensMap['access_token'] as String;
+                final newRefreshToken = tokensMap['refresh_token'] as String;
                 await _tokenService.saveAccessToken(newAccessToken);
                 await _tokenService.saveRefreshToken(newRefreshToken);
 
