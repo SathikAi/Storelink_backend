@@ -157,6 +157,7 @@ async def create_upgrade_payment(
             payment_link=True,
             product_cart=[{"product_id": product_id, "quantity": 1}],
             customer={"email": current_user.email or "", "name": business.business_name},
+            billing={"city": "India", "country": "IN", "state": "IN", "street": "-", "zipcode": "000000"},
             metadata={"business_uuid": business.uuid, "plan_type": plan_type},
             return_url=return_url,
         )
