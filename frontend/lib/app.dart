@@ -23,6 +23,7 @@ import 'presentation/screens/store/store_checkout_screen.dart';
 import 'presentation/screens/store/order_confirmation_screen.dart';
 import 'presentation/screens/store/order_status_screen.dart';
 import 'presentation/screens/admin/admin_portal_screen.dart';
+import 'presentation/screens/settings/help_support_screen.dart';
 import 'core/services/biometric_service.dart';
 import 'core/services/debug_log_service.dart';
 import 'core/utils/web_bridge.dart'
@@ -68,6 +69,7 @@ final _router = GoRouter(
     GoRoute(path: '/categories', builder: (_, __) => const CategoriesListScreen()),
     GoRoute(path: '/inventory', builder: (_, __) => const InventoryListScreen()),
     GoRoute(path: '/upgrade', builder: (_, __) => const UpgradePlanScreen()),
+    GoRoute(path: '/help-support', builder: (_, __) => const HelpSupportScreen()),
     GoRoute(path: '/admin', builder: (_, __) => const AdminPortalScreen()),
 
     // ── Customer store routes (public, no auth needed) ────────────────────

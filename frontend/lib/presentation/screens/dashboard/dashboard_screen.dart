@@ -315,6 +315,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                   Navigator.pop(context);
                   _showBiometricSettings(context);
                 }),
+                _drawerItem(Icons.headset_mic_rounded, 'Help & Support', () {
+                  Navigator.pop(context);
+                  context.push('/help-support');
+                }),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Divider(),
