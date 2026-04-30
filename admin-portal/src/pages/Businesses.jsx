@@ -40,8 +40,8 @@ const Businesses = () => {
     const matchesFilter = filter === 'all' || 
                          (filter === 'active' && b.is_active) || 
                          (filter === 'inactive' && !b.is_active) ||
-                         (filter === 'paid' && b.plan === 'PAID') ||
-                         (filter === 'free' && b.plan === 'FREE');
+                         (filter === 'paid' && b.plan === 'PAID' && b.subscription_type !== 'trial') ||
+                         (filter === 'free' && (b.plan === 'FREE' || b.subscription_type === 'trial'));
     return matchesSearch && matchesFilter;
   });
 
@@ -109,10 +109,17 @@ const Businesses = () => {
                   </td>
                   <td>
                     <div className="plan-badge-container">
-                      <span className={`badge plan-${b.plan.toLowerCase()}`}>
-                        {b.plan}
-                      </span>
-                      {b.plan === 'PAID' && <CreditCard size={14} className="text-primary" />}
+                      {(() => {
+                        const isRealPaid = b.plan === 'PAID' && b.subscription_type !== 'trial';
+                        return (
+                          <>
+                            <span className={`badge plan-${isRealPaid ? 'paid' : 'free'}`}>
+                              {isRealPaid ? 'PAID' : 'FREE'}
+                            </span>
+                            {isRealPaid && <CreditCard size={14} className="text-primary" />}
+                          </>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td>

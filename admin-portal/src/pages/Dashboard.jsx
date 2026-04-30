@@ -64,10 +64,11 @@ const Dashboard = () => {
 
   const { stats, businesses, recent_users, pagination } = data;
 
-  // Transform plan distribution for chart
+  // Transform plan distribution for chart (trial = FREE, only real payments = PAID)
+  const trialCount = stats.trial_plan_businesses || 0;
   const planData = [
-    { name: 'Free', value: stats.free_plan_businesses || 0 },
-    { name: 'Paid', value: stats.paid_plan_businesses || 0 },
+    { name: 'Free', value: (stats.free_plan_businesses || 0) + trialCount },
+    { name: 'Paid', value: Math.max((stats.paid_plan_businesses || 0) - trialCount, 0) },
   ];
 
   const filteredBusinesses = businesses.filter(b => 
@@ -153,9 +154,14 @@ const Dashboard = () => {
                     </td>
                     <td>{b.owner_name}</td>
                     <td>
-                      <span className={`badge plan-${b.plan.toLowerCase()}`}>
-                        {b.plan}
-                      </span>
+                      {(() => {
+                        const isRealPaid = b.plan === 'PAID' && b.subscription_type !== 'trial';
+                        return (
+                          <span className={`badge plan-${isRealPaid ? 'paid' : 'free'}`}>
+                            {isRealPaid ? 'PAID' : 'FREE'}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td>
                       <span className={`badge status-${b.is_active ? 'active' : 'inactive'}`}>
