@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -26,23 +27,31 @@ class HelpSupportScreen extends StatelessWidget {
   }
 
   Future<void> _openEmail(BuildContext context) async {
-    final uri = Uri(
-      scheme: 'mailto',
-      path: _supportEmail,
-      queryParameters: {
-        'subject': 'StoreLink Support Request',
-        'body': 'Hi StoreLink Team,\n\nI need help with:\n\n',
-      },
-    );
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Email app could not be opened')),
-        );
+    // Build mailto string manually — avoids encoding issues with queryParameters
+    final mailtoStr =
+        'mailto:$_supportEmail?subject=${Uri.encodeComponent('StoreLink Support Request')}'
+        '&body=${Uri.encodeComponent('Hi StoreLink Team,\n\nI need help with:\n\n')}';
+    try {
+      final launched = await launchUrl(
+        Uri.parse(mailtoStr),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && context.mounted) {
+        _showCopyEmailSnackbar(context);
       }
+    } catch (_) {
+      if (context.mounted) _showCopyEmailSnackbar(context);
     }
+  }
+
+  void _showCopyEmailSnackbar(BuildContext context) {
+    Clipboard.setData(const ClipboardData(text: _supportEmail));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Email copied to clipboard: $_supportEmail'),
+        action: SnackBarAction(label: 'OK', onPressed: () {}),
+      ),
+    );
   }
 
   @override

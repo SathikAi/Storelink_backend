@@ -443,12 +443,15 @@ class _DashboardBody extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // Avatar + refresh
+                      // Avatar + menu
                       Column(
                         children: [
                           Builder(builder: (ctx) => GestureDetector(
                             onTap: () => Scaffold.of(ctx).openDrawer(),
-                            child: CircleAvatar(
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                CircleAvatar(
                               radius: 24,
                               backgroundColor: Colors.white.withOpacity(0.2),
                               backgroundImage: (business?.logoUrl != null &&
@@ -465,6 +468,22 @@ class _DashboardBody extends StatelessWidget {
                                           fontSize: 18),
                                     )
                                   : null,
+                            ),
+                                // Menu indicator badge
+                                Positioned(
+                                  bottom: -2,
+                                  right: -2,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 4)],
+                                    ),
+                                    child: Icon(Icons.menu_rounded, size: 12, color: AppColors.primary),
+                                  ),
+                                ),
+                              ],
                             ),
                           )),
                           const SizedBox(height: 8),
