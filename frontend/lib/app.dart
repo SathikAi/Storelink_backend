@@ -357,13 +357,44 @@ class _GoogleAuthCallbackScreenState extends State<_GoogleAuthCallbackScreen> {
 
     // ── Cold-start / web path ─────────────────────────────────────────────────
     // App was killed and re-opened via deep link (mobile), or this is a web
-    // callback after redirect. supabase_flutter handles PKCE internally — we
-    // just wait for the session to appear.
+    // callback after redirect.
     DebugLog.i('GoogleAuth', 'callback-screen: branch=cold-start kIsWeb=$kIsWeb');
     final supabase = Supabase.instance.client;
 
     Session? session = supabase.auth.currentSession;
-    if (session == null) {
+
+    // On web with PKCE: explicitly call getSessionFromUrl() so we don't depend
+    // on auto-detection inside initialize(), which fires signedIn BEFORE our
+    // listener is attached (race condition on broadcast stream).
+    if (session == null && kIsWeb) {
+      final callbackUri = Uri.base;
+      if (callbackUri.queryParameters.containsKey('code')) {
+        DebugLog.i('GoogleAuth', 'callback-screen: web explicit getSessionFromUrl');
+        try {
+          final authResponse = await supabase.auth.getSessionFromUrl(callbackUri);
+          session = authResponse.session;
+          DebugLog.i('GoogleAuth', 'callback-screen: getSessionFromUrl ok');
+        } catch (e) {
+          // Code may already have been consumed by initialize()'s auto-detection.
+          // Fall back: wait briefly for the signedIn event it would have emitted.
+          DebugLog.i('GoogleAuth', 'callback-screen: getSessionFromUrl threw: $e');
+          try {
+            final event = await supabase.auth.onAuthStateChange
+                .where((ev) =>
+                    ev.event == AuthChangeEvent.signedIn ||
+                    ev.event == AuthChangeEvent.tokenRefreshed)
+                .first
+                .timeout(const Duration(seconds: 8));
+            session = event.session;
+          } catch (_) {
+            session = supabase.auth.currentSession;
+          }
+        }
+      }
+    }
+
+    // Mobile cold-start: wait for supabase_flutter to exchange the deep-link code.
+    if (session == null && !kIsWeb) {
       try {
         final event = await supabase.auth.onAuthStateChange
             .where((e) =>
