@@ -111,24 +111,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # ── Admin Portal (React) ──────────────────────────────────
-  admin-portal:
-    build:
-      context: ./admin-portal
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: ${API_BASE_URL}
-    container_name: storelink_admin
-    restart: unless-stopped
-    networks:
-      - storelink_net
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 20s
-
   # ── Supabase IPv4→IPv6 proxy (Docker has no IPv6 routing) ──
   supabase-proxy:
     image: alpine/socat
@@ -146,8 +128,6 @@ services:
       backend:
         condition: service_healthy
       frontend:
-        condition: service_healthy
-      admin-portal:
         condition: service_healthy
     ports:
       - "80:80"
