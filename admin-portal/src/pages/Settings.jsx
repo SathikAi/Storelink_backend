@@ -67,12 +67,12 @@ const Settings = () => {
               </div>
               <div className="form-group">
                 <label>API Endpoint</label>
-                <input type="text" className="glass-input" defaultValue="http://localhost:9001/v1" readOnly />
+                <input type="text" className="glass-input" defaultValue={import.meta.env.VITE_API_BASE_URL || 'https://storelink.sbs/v1'} readOnly />
                 <p className="help-text">Production API endpoint used by the admin portal.</p>
               </div>
               <div className="form-group">
                 <label>CORS Allowed Origins</label>
-                <textarea className="glass-input" rows="3" defaultValue="http://localhost:3000, http://localhost:3001" />
+                <textarea className="glass-input" rows="3" defaultValue="https://storelink.sbs" />
               </div>
             </div>
           )}
